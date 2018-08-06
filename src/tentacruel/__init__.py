@@ -1,103 +1,170 @@
 import asyncio
+from asyncio import Future
 import json
 import sys
 from json import JSONDecodeError
 from urllib.parse import parse_qs, urlencode
 
+from tentacruel.service import _HeosService
+from tentacruel.system import _HeosSystem
+from tentacruel.browse import _HeosBrowse
+
 receiver_ip = "192.168.0.10"
 heos_port = 1255
 
-class _HeosSystem():
-    def __init__(self,protocol):
-        self.protocol=protocol
-
-    async def register_for_change_events(self,enable=True) -> asyncio.Future:
-        future = self.protocol.run_command(
-            "system/register_for_change_events",
-            dict(enable = "on" if enable else "off")
-        )
-
-        result = await future
-
-
-class _HeosBrowse():
-    def __init__(self,protocol):
-        self.protocol=protocol
-
-    async def get_music_sources(self) -> asyncio.Future:
-        future = self.protocol.run_command("browse/get_music_sources")
-        result = await future
-        print(result)
+LOCAL_MUSIC = 1024
+PLAYLISTS = 1025
+HISTORY = 1026
+AUX = 1027
+FAVORITES = 1028
 
 class HeosClientProtocol(asyncio.Protocol):
+    """
+    Asynchronous protocol handler for Denon's Heos protocol for controlling home theatre receivers
+    """
+
     def __init__(self,loop):
-        self.loop = loop
-        self.buffer = ""
+        self._loop = loop
+        self._buffer = ""
         self.system = _HeosSystem(self)
         self.browse = _HeosBrowse(self)
         self.inflight_commands = dict()
+        self._sources = {}
+        self._sequence = 1
 
     def connection_made(self,transport):
+        """
+        Override method of Protocol called when connection is established.
+
+        :param transport:
+        :return:
+        """
         self.transport = transport
-        self.loop.create_task(self.setup())
+        self._loop.create_task(self._setup())
 
     def data_received(self,data):
-        self.buffer += data.decode()
+        """
+        Override method of Protocol to handle incoming data.
+
+        Collects incoming data in buffer,  breaks that data up into JSON packets which are
+        delimited by '\r\n'.  Passes JSON packets into `_handle_response`
+
+        :param data: available bytes
+        :return:
+        """
+        self._buffer += data.decode()
         while True:
             try:
-                index = self.buffer.index("\r\n")
+                index = self._buffer.index("\r\n")
             except ValueError:
                 return
 
-            packet = self.buffer[0:index]
-            self.buffer = self.buffer[index+2:]
+            packet = self._buffer[0:index]
+            self._buffer = self._buffer[index + 2:]
             try:
                 jdata = json.loads(packet)
-                self.handle_response(jdata)
+                self._handle_response(jdata)
             except JSONDecodeError:
                 print("Error parsing "+jdata+" as json")
 
+    def _handle_response(self, jdata):
+        """
+        Handles JSON response from server.  JSON responses can be produced in response to
+        command as well as events that happen to the receiver.  Events are routed to the
+        event handler,  while the system uses command names and sequence numbers to
+        match commands with the futures that our clients are waiting on.
 
-    def handle_response(self,jdata):
+        :param jdata: a dict containing a parsed response Packet
+        :return:
+        """
         command = jdata["heos"]["command"]
+
         if command.startswith("event/"):
             event = command[command.index("/"):]
             message = {key: value[0] for key, value in parse_qs(jdata["heos"]["message"]).items()}
-            self.handle_event(event,message)
+            self._handle_event(event, message)
         else:
-            future:asyncio.Future = self.inflight_commands[command]
-            del self.inflight_commands[command]
+            if jdata["heos"]["message"].startswith("command under process"):
+                return
+
+            message = {key: value[0] for key, value in parse_qs(jdata["heos"]["message"]).items()}
+            futures = self.inflight_commands[command]
+            if "SEQUENCE" in message:
+                sequence = int(message["SEQUENCE"])
+                future = futures[sequence]
+                del futures[sequence]
+            elif len(futures) == 1:
+                key = list(futures.keys())[0]
+                future = futures[key]
+                del futures[key]
+            elif len(futures) == 0:
+                raise ValueError("No future found to match command: "+command)
+            elif len(futures) > 1:
+                raise ValueError("Multiple matching futures found for command: "+command)
+
             if not jdata["heos"]["result"] == "success":
                 future.set_exception(Exception("Error processing HEOS command",jdata))
-            else:
-                if jdata["heos"]["message"]:
-                    result={key: value[0] for key, value in parse_qs(jdata["heos"]["message"]).items()}
-                else:
-                    result=jdata["payload"]
-                future.set_result(result)
 
-    def handle_event(self,event,message):
+            payload = jdata.get("payload")
+            if message and payload:
+                future.set_result(dict(message=message,payload=payload))
+            elif message:
+                future.set_result(message)
+            elif payload:
+                future.set_result(payload)
+
+    def _handle_event(self, event, message):
         print("Got event"+event)
         print(message)
 
     def connection_lost(self,exc):
-        self.loop.stop()
+        self._loop.stop()
 
-    async def setup(self):
+    async def _setup(self):
+        """
+        Tasks we run as soon as the server is connected.  This includes turning on events,
+        listing available music sources,  etc.
+
+        In the immediate term I am working on a complete cycle of finding a piece of music
+        and playing it and I am doing that here because it is easy,  probably if we want
+        to separate this from the protocol,  this function can be implemented as a callback.
+
+        :return:
+        """
         await self.system.register_for_change_events()
+        sources = await self.browse.get_music_sources()
+        self._sources = {source["sid"]:source for source in sources if source["available"]=="true"}
+        local_sources = (await self.browse.browse(LOCAL_MUSIC))["payload"]
+        looking_for = "Plex Media Server: tamamo"
+        ok_sources = [source for source in local_sources if source["name"] == looking_for]
+        sid = ok_sources[0]["sid"]
+        r2 = await self.browse.browse_for_name(["Music","Music","By Album","Thomas Dolby - Aliens Ate My Buick (1988)"],sid)
+        r3 = await self.browse.browse(sid,r2["cid"])
+        print(r3)
 
-    def run_command(self,command:str ,arguments:dict={}) -> asyncio.Future:
+
+
+    def _run_command(self, command:str, arguments:dict={}) -> asyncio.Future:
+        future = self._loop.create_future()
+        this_event = self._sequence
+        self._sequence += 1
+
+        if not command in self.inflight_commands:
+            self.inflight_commands[command] = {}
+        self.inflight_commands[command][this_event] = future
+
         base_url = f"heos://{command}"
+        if arguments:
+            arguments["SEQUENCE"]=this_event
+
         if arguments:
             url = base_url + "?" + urlencode(arguments)
         else:
             url = base_url
 
         cmd = url + "\r\n"
-        print(cmd)
         self.transport.write(cmd.encode("utf-8"))
-        future = self.loop.create_future()
-        self.inflight_commands[command] = future
+
         return future
 
 
