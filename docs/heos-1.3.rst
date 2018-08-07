@@ -608,70 +608,26 @@ Prettify JSON response
    be appeared if the player(s) is part of a group. Note: control field
    is only populated when lineout level type is Fixed (lineout = 2)
 
-   Response:
+   Response::
+   
+      {
+         "heos": {
+            "command": "player/get_players", 
+            "result": "success",
+            "message": ""
+          },
 
-   {
-
-"heos": {
-
-},
-
-   "command": "player/get_players", "result": "success",
-
-   "message": ""
-
-"payload": [
-
-{
-
-},
-
-{
-
-},
-
-.
-
-.
-
-.
-
-{
-
-   "name": "'player name 1'",
-
-   "pid": "player id 1'",
-
-   "gid": "group id'",
-
-   "model": "'player model 1'", "version": "'player verison 1'"
-   "lineout": "level type" "control": "control option"
-
-   "name": "'player name 2'",
-
-   "pid": "player id 2'",
-
-   "gid": "group id'",
-
-   "model": "'player model 2'", "version": "'player verison 2'"
-   "lineout": "level type" "control": "control option"
-
-   "name": "'player name N'",
-
-   "pid": "player id N'",
-
-   "gid": "group id'",
-
-   "model": "'player model N'", "version": "'player verison N'"
-   "lineout": "level type"
-
-   "control": "control option"
-
-   }
-
-   ]
-
-   }
+        "payload": [
+            {
+               "name": "'player name 1'",
+               "pid": "player id 1'",
+               "gid": "group id'",
+               "model": "'player model 1'",
+               "version": "'player verison 1'"
+               "lineout": "level type" 
+               "control": "control option"
+            }, ...]
+       }
 
    Example: heos://player/get_players
 
