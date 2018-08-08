@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlencode
 from tentacruel.service import _HeosService
 from tentacruel.system import _HeosSystem
 from tentacruel.browse import _HeosBrowse
+from tentacruel.player import _HeosPlayer
 
 receiver_ip = "192.168.0.10"
 heos_port = 1255
@@ -28,6 +29,8 @@ class HeosClientProtocol(asyncio.Protocol):
         self._buffer = ""
         self.system = _HeosSystem(self)
         self.browse = _HeosBrowse(self)
+        self.player = _HeosPlayer(self)
+
         self.inflight_commands = dict()
         self._sources = {}
         self._sequence = 1
@@ -104,6 +107,7 @@ class HeosClientProtocol(asyncio.Protocol):
 
             if not jdata["heos"]["result"] == "success":
                 future.set_exception(Exception("Error processing HEOS command",jdata))
+                return
 
             payload = jdata.get("payload")
             if message and payload:
@@ -132,15 +136,26 @@ class HeosClientProtocol(asyncio.Protocol):
         :return:
         """
         await self.system.register_for_change_events()
+        self._players = await self.player.get_players()
+        self._player_id = self._players[0]['pid']
+        await self.player.set_play_state("play")
+        await self.player.remove_from_queue(range(30,70))
+        print(await self.player.get_queue())
+        return
+
         sources = await self.browse.get_music_sources()
         self._sources = {source["sid"]:source for source in sources if source["available"]=="true"}
+
+
         local_sources = (await self.browse.browse(LOCAL_MUSIC))["payload"]
         looking_for = "Plex Media Server: tamamo"
         ok_sources = [source for source in local_sources if source["name"] == looking_for]
         sid = ok_sources[0]["sid"]
         r2 = await self.browse.browse_for_name(["Music","Music","By Album","Thomas Dolby - Aliens Ate My Buick (1988)"],sid)
         r3 = await self.browse.browse(sid,r2["cid"])
-        print(r3)
+
+
+        #print(r3)
 
 
 
@@ -154,14 +169,15 @@ class HeosClientProtocol(asyncio.Protocol):
         self.inflight_commands[command][this_event] = future
 
         base_url = f"heos://{command}"
-        if arguments:
-            arguments["SEQUENCE"]=this_event
+#        if arguments:
+#            arguments["SEQUENCE"]=this_event
 
         if arguments:
             url = base_url + "?" + urlencode(arguments)
         else:
             url = base_url
 
+        print("Sending command "+url)
         cmd = url + "\r\n"
         self.transport.write(cmd.encode("utf-8"))
 
