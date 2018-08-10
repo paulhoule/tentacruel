@@ -1,3 +1,7 @@
+"""
+Module to control Denon/Marantz
+"""
+
 import asyncio
 from asyncio import Future
 import json
@@ -10,8 +14,8 @@ from tentacruel.system import _HeosSystem
 from tentacruel.browse import _HeosBrowse
 from tentacruel.player import _HeosPlayer
 
-receiver_ip = "192.168.0.10"
-heos_port = 1255
+RECEIVER_IP = "192.168.0.10"
+HEOS_PORT = 1255
 
 LOCAL_MUSIC = 1024
 PLAYLISTS = 1025
@@ -19,13 +23,20 @@ HISTORY = 1026
 AUX = 1027
 FAVORITES = 1028
 
+class HeosError(Exception):
+    def __init__(self,error_id,message):
+        super().__init__(f"Heos error {error_id}: {message}")
+        self.error_id=error_id
+        self.message=message
+
 class HeosClientProtocol(asyncio.Protocol):
     """
     Asynchronous protocol handler for Denon's Heos protocol for controlling home theatre receivers
     """
 
-    def __init__(self,loop):
-        self._loop = loop
+    # pylint: disable=too-many-instance-attributes
+    def __init__(self, my_loop):
+        self._loop = my_loop
         self._buffer = ""
         self.system = _HeosSystem(self)
         self.browse = _HeosBrowse(self)
@@ -35,7 +46,7 @@ class HeosClientProtocol(asyncio.Protocol):
         self._sources = {}
         self._sequence = 1
 
-    def connection_made(self,transport):
+    def connection_made(self, transport):
         """
         Override method of Protocol called when connection is established.
 
@@ -45,7 +56,7 @@ class HeosClientProtocol(asyncio.Protocol):
         self.transport = transport
         self._loop.create_task(self._setup())
 
-    def data_received(self,data):
+    def data_received(self, data):
         """
         Override method of Protocol to handle incoming data.
 
@@ -68,7 +79,7 @@ class HeosClientProtocol(asyncio.Protocol):
                 jdata = json.loads(packet)
                 self._handle_response(jdata)
             except JSONDecodeError:
-                print("Error parsing "+jdata+" as json")
+                print("Error parsing " + jdata + " as json")
 
     def _handle_response(self, jdata):
         """
@@ -100,28 +111,32 @@ class HeosClientProtocol(asyncio.Protocol):
                 key = list(futures.keys())[0]
                 future = futures[key]
                 del futures[key]
-            elif len(futures) == 0:
-                raise ValueError("No future found to match command: "+command)
+            elif not futures:
+                raise ValueError("No future found to match command: " + command)
             elif len(futures) > 1:
-                raise ValueError("Multiple matching futures found for command: "+command)
+                raise ValueError("Multiple matching futures found for command: " + command)
 
             if not jdata["heos"]["result"] == "success":
-                future.set_exception(Exception("Error processing HEOS command",jdata))
+                message = jdata["heos"]["message"]
+                message = {key: value[0] for key, value in
+                           parse_qs(jdata["heos"]["message"]).items()}
+                future.set_exception(HeosError(message["eid"],message["text"]))
                 return
 
             payload = jdata.get("payload")
             if message and payload:
-                future.set_result(dict(message=message,payload=payload))
+                future.set_result(dict(message=message, payload=payload))
             elif message:
                 future.set_result(message)
             elif payload:
                 future.set_result(payload)
 
+    # pylint: disable=no-self-use
     def _handle_event(self, event, message):
-        print("Got event"+event)
+        print("Got event" + event)
         print(message)
 
-    def connection_lost(self,exc):
+    def connection_lost(self, exc):
         self._loop.stop()
 
     async def _setup(self):
@@ -138,28 +153,24 @@ class HeosClientProtocol(asyncio.Protocol):
         await self.system.register_for_change_events()
         self._players = await self.player.get_players()
         self._player_id = self._players[0]['pid']
-        await self.player.set_play_state("play")
-        await self.player.remove_from_queue(range(30,70))
+        await self.player.set_play_state("stop")
         print(await self.player.get_queue())
-        return
 
         sources = await self.browse.get_music_sources()
-        self._sources = {source["sid"]:source for source in sources if source["available"]=="true"}
+        self._sources = {source["sid"]: source for source in sources if
+                         source["available"] == "true"}
 
+#        local_sources = (await self.browse.browse(LOCAL_MUSIC))["payload"]
+#        looking_for = "Plex Media Server: tamamo"
+#        ok_sources = [source for source in local_sources if source["name"] == looking_for]
+##        sid = ok_sources[0]["sid"]
+#        result2 = await self.browse.browse_for_name(
+ #           ["Music", "Music", "By Album", "Thomas Dolby - Aliens Ate My Buick (1988)"], sid)
+ #       r3 = await self.browse.browse(sid, result2["cid"])
 
-        local_sources = (await self.browse.browse(LOCAL_MUSIC))["payload"]
-        looking_for = "Plex Media Server: tamamo"
-        ok_sources = [source for source in local_sources if source["name"] == looking_for]
-        sid = ok_sources[0]["sid"]
-        r2 = await self.browse.browse_for_name(["Music","Music","By Album","Thomas Dolby - Aliens Ate My Buick (1988)"],sid)
-        r3 = await self.browse.browse(sid,r2["cid"])
+        # print(r3)
 
-
-        #print(r3)
-
-
-
-    def _run_command(self, command:str, arguments:dict={}) -> asyncio.Future:
+    def _run_command(self, command: str, arguments: dict = {}) -> asyncio.Future:
         future = self._loop.create_future()
         this_event = self._sequence
         self._sequence += 1
@@ -169,26 +180,25 @@ class HeosClientProtocol(asyncio.Protocol):
         self.inflight_commands[command][this_event] = future
 
         base_url = f"heos://{command}"
-#        if arguments:
-#            arguments["SEQUENCE"]=this_event
+        #        if arguments:
+        #            arguments["SEQUENCE"]=this_event
 
         if arguments:
-            url = base_url + "?" + urlencode(arguments)
+            url = base_url + "?" + "&".join(f"{key}={value}" for (key,value) in arguments.items())
         else:
             url = base_url
 
-        print("Sending command "+url)
+        print("Sending command " + url)
         cmd = url + "\r\n"
         self.transport.write(cmd.encode("utf-8"))
 
         return future
 
 
-
 loop = asyncio.get_event_loop()
 coro = loop.create_connection(
     lambda: HeosClientProtocol(loop),
-    receiver_ip, heos_port
+    RECEIVER_IP, HEOS_PORT
 )
 
 loop.run_until_complete(coro)

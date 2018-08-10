@@ -183,3 +183,45 @@ class _HeosPlayer(_HeosService):
             arguments= dict(pid=pid,qid=",".join(map(str,qid)))
         )
 
+    #
+    # this doesn't seem to be working at the moment!
+    #
+
+    async def save_queue(self,name: str,pid=None) -> Future:
+        if pid==None:
+            pid=self._get_player_id()
+
+        if not name or len(name)>128:
+            raise ValueError("The playlist name must be less than 128 characters")
+
+        return await self._run(
+            "save_queue",
+            arguments = dict(pid=pid,name=name)
+        )
+
+    async def clear_queue(self,pid=None) -> Future:
+        if pid==None:
+            pid=self._get_player_id()
+
+        return await self._run(
+            "clear_queue",
+            arguments=dict(pid=pid)
+        )
+
+    async def play_next(self,pid=None) -> Future:
+        if pid==None:
+            pid=self._get_player_id()
+
+        return await self._run(
+            "play_next",
+            arguments=dict(pid=pid)
+        )
+
+    async def play_previous(self,pid=None) -> Future:
+        if pid==None:
+            pid=self._get_player_id()
+
+        return await self._run(
+            "play_previous",
+            arguments=dict(pid=pid)
+        )
