@@ -160,10 +160,12 @@ class HeosClientProtocol(asyncio.Protocol):
         self._sources = {source["sid"]: source for source in sources if
                          source["available"] == "true"}
 
-#        local_sources = (await self.browse.browse(LOCAL_MUSIC))["payload"]
-#        looking_for = "Plex Media Server: tamamo"
-#        ok_sources = [source for source in local_sources if source["name"] == looking_for]
-##        sid = ok_sources[0]["sid"]
+        local_sources = (await self.browse.browse(LOCAL_MUSIC))["payload"]
+        looking_for = "Plex Media Server: tamamo"
+        ok_sources = [source for source in local_sources if source["name"] == looking_for]
+        sid = ok_sources[0]["sid"]
+
+        print(await self.browse.get_search_criteria(sid))
 #        result2 = await self.browse.browse_for_name(
  #           ["Music", "Music", "By Album", "Thomas Dolby - Aliens Ate My Buick (1988)"], sid)
  #       r3 = await self.browse.browse(sid, result2["cid"])

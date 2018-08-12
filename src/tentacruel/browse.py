@@ -23,6 +23,10 @@ class _HeosBrowse(_HeosService):
             args
         )
 
+    #
+    # not in HEOS api but it makes coding against the HEOS API much easier
+    #
+
     async def browse_for_name(self,name,sid,*args,**kwargs):
         if isinstance(name,list):
             for subname in name:
@@ -39,3 +43,5 @@ class _HeosBrowse(_HeosService):
 
             raise KeyError("Could not find object with name "+media)
 
+    async def get_search_criteria(self, sid:int) -> Future:
+        return await self._run("get_search_criteria",{"sid":sid})
