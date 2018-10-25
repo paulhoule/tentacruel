@@ -3,11 +3,9 @@ Module to control Denon/Marantz
 """
 
 import asyncio
-from asyncio import Future
 import json
-import sys
 from json import JSONDecodeError
-from urllib.parse import parse_qs, urlencode
+from urllib.parse import parse_qs
 
 from tentacruel.service import _HeosService
 from tentacruel.system import _HeosSystem
@@ -35,9 +33,12 @@ class HeosClientProtocol(asyncio.Protocol):
     """
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, my_loop):
+    def __init__(self, my_loop, start_action=None, halt=True):
         self._loop = my_loop
+        self._start_action = start_action
         self._buffer = ""
+        self._halt = halt
+
         self.system = _HeosSystem(self)
         self.browse = _HeosBrowse(self)
         self.player = _HeosPlayer(self)
@@ -106,10 +107,12 @@ class HeosClientProtocol(asyncio.Protocol):
             if "SEQUENCE" in message:
                 sequence = int(message["SEQUENCE"])
                 future = futures[sequence]
+                print("Removing " + str(future))
                 del futures[sequence]
             elif len(futures) == 1:
                 key = list(futures.keys())[0]
                 future = futures[key]
+                print("Removing " + str(future))
                 del futures[key]
             elif not futures:
                 raise ValueError("No future found to match command: " + command)
@@ -152,25 +155,20 @@ class HeosClientProtocol(asyncio.Protocol):
         """
         await self.system.register_for_change_events()
         self._players = await self.player.get_players()
-        self._player_id = self._players[0]['pid']
-        await self.player.set_play_state("stop")
-        print(await self.player.get_queue())
 
-        sources = await self.browse.get_music_sources()
-        self._sources = {source["sid"]: source for source in sources if
-                         source["available"] == "true"}
+        if self._start_action:
+            await self._start_action(self)
 
-        local_sources = (await self.browse.browse(LOCAL_MUSIC))["payload"]
-        looking_for = "Plex Media Server: tamamo"
-        ok_sources = [source for source in local_sources if source["name"] == looking_for]
-        sid = ok_sources[0]["sid"]
+        if self._halt:
+            self._loop.stop()
 
-        print(await self.browse.get_search_criteria(sid))
+#        print(await self.browse.get_search_criteria(sid))
 #        result2 = await self.browse.browse_for_name(
  #           ["Music", "Music", "By Album", "Thomas Dolby - Aliens Ate My Buick (1988)"], sid)
  #       r3 = await self.browse.browse(sid, result2["cid"])
 
         # print(r3)
+
 
     def _run_command(self, command: str, arguments: dict = {}) -> asyncio.Future:
         future = self._loop.create_future()
@@ -197,12 +195,3 @@ class HeosClientProtocol(asyncio.Protocol):
         return future
 
 
-loop = asyncio.get_event_loop()
-coro = loop.create_connection(
-    lambda: HeosClientProtocol(loop),
-    RECEIVER_IP, HEOS_PORT
-)
-
-loop.run_until_complete(coro)
-loop.run_forever()
-loop.close()
