@@ -7,6 +7,7 @@ from asyncio import Future
 import json
 import sys
 from json import JSONDecodeError
+from typing import Coroutine
 from urllib.parse import parse_qs, urlencode
 
 from tentacruel.service import _HeosService
@@ -14,7 +15,7 @@ from tentacruel.system import _HeosSystem
 from tentacruel.browse import _HeosBrowse
 from tentacruel.player import _HeosPlayer
 
-RECEIVER_IP = "192.168.0.10"
+RECEIVER_IP = "192.168.0.33"
 HEOS_PORT = 1255
 
 LOCAL_MUSIC = 1024
@@ -35,8 +36,9 @@ class HeosClientProtocol(asyncio.Protocol):
     """
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, my_loop):
+    def __init__(self, my_loop, on_start: Coroutine = None):
         self._loop = my_loop
+        self._on_start = on_start
         self._buffer = ""
         self.system = _HeosSystem(self)
         self.browse = _HeosBrowse(self)
@@ -160,12 +162,15 @@ class HeosClientProtocol(asyncio.Protocol):
         self._sources = {source["sid"]: source for source in sources if
                          source["available"] == "true"}
 
-        local_sources = (await self.browse.browse(LOCAL_MUSIC))["payload"]
-        looking_for = "Plex Media Server: tamamo"
-        ok_sources = [source for source in local_sources if source["name"] == looking_for]
-        sid = ok_sources[0]["sid"]
+        if self._on_start:
+            await self._on_start(self)
 
-        print(await self.browse.get_search_criteria(sid))
+#        local_sources = (await self.browse.browse(LOCAL_MUSIC))["payload"]
+#        looking_for = "Plex Media Server: tamamo"
+#        ok_sources = [source for source in local_sources if source["name"] == looking_for]
+#        sid = ok_sources[0]["sid"]
+
+#        print(await self.browse.search(sid,"Madonna",20))
 #        result2 = await self.browse.browse_for_name(
  #           ["Music", "Music", "By Album", "Thomas Dolby - Aliens Ate My Buick (1988)"], sid)
  #       r3 = await self.browse.browse(sid, result2["cid"])
@@ -198,8 +203,12 @@ class HeosClientProtocol(asyncio.Protocol):
 
 
 loop = asyncio.get_event_loop()
+
+async def on_start(protocol):
+    print(await protocol.player.play_queue())
+
 coro = loop.create_connection(
-    lambda: HeosClientProtocol(loop),
+    lambda: HeosClientProtocol(loop,on_start),
     RECEIVER_IP, HEOS_PORT
 )
 
