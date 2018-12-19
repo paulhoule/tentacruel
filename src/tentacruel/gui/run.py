@@ -6,28 +6,98 @@ from tentacruel import HeosClientProtocol, RECEIVER_IP, HEOS_PORT
 
 
 class Application(tk.Frame):
+    def _add(self,name,widget_type,*args,**kwargs):
+        widget = widget_type(self,*args,**kwargs)
+        widget.grid()
+        setattr(self,name,widget)
+
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
         self.alive = True
         self.grid()
-        self.quit_button = tk.Button(self,text="Quit",command=self.quit,width=50,height=1)
-        self.quit_button.grid()
-        self.go_button = tk.Button(self,text="Go",command=self.go,width=50,height=1)
-        self.go_button.grid()
-        self.label = tk.Label(self,text="...",width=50,height=5)
-        self.label.grid()
+        self._add("quit_button",tk.Button,text="Quit",command=self.quit,width=50,height=1)
+        self._add("device_selector",tk.Spinbox,command=self.task(self.select_device))
+        self._add("label",tk.Label,text="",width=50,height=1)
+        self._add("play_button", tk.Button, text="Play", width=50, height=1,
+                  command=self.task(self.play_command))
+        self._add("volume",
+                  tk.Scale, from_=0, to=100.0, length = 200,
+                  command = self.task(self.set_volume),
+                  orient=tk.HORIZONTAL)
 
     def quit(self):
         self.alive = False
         super().quit()
 
-    def go(self):
-        asyncio.create_task(self._go())
+    def task(self,that):
+        def wrapper(*args,**kwargs):
+            asyncio.create_task(that(*args,**kwargs))
 
-    async def _go(self):
-        players = await hcp.player.get_players()
-        self.label["text"] = players[0]["name"]
-        print(players)
+        return wrapper
+
+    def _handle_event(self,event,message):
+        print("received event "+str(event))
+        if event=="/player_state_changed":
+            self._handle_state_changed(message)
+        elif event == "/player_volume_changed":
+            self._handle_volume_changed(message)
+
+    def wrong_pid(self,message):
+        that_pid = int(message["pid"])
+        my_pid = int(self._current_player_info()["pid"])
+        return (that_pid != my_pid)
+
+    def _handle_state_changed(self,message):
+        if self.wrong_pid(message):
+            return
+
+        self.play_button["text"] = "Stop" if message["state"] == 'play' else "Play"
+
+    def _handle_volume_changed(self,message):
+        if self.wrong_pid(message):
+            return
+
+        self.volume.set(message["level"])
+
+    async def comms_up(self,hcp):
+        print("in comms_up")
+        self.hcp = hcp
+        self.hcp.add_listener(self._handle_event)
+        players = hcp.get_players()
+        self.device_selector["values"] = tuple(player["name"] for player in players)
+        await self.select_device()
+
+    async def select_device(self):
+        print("in select_device")
+        player_info = self._current_player_info()
+        self.label["text"] = player_info["model"]
+        await self._update_player()
+
+    async def _update_player(self):
+        player = self._player()
+        state = (await player.get_play_state())['state']
+        self.play_button["text"] = "Stop" if state=='play' else "Play"
+        volume = (await player.get_volume())["level"]
+        self.volume.set(volume)
+
+    async def play_command(self):
+        player = self._player()
+        new_state = self.play_button["text"].lower()
+        await player.set_play_state(new_state)
+
+    async def set_volume(self,level):
+        print(level)
+        volume = self.volume.get()
+        await self._player().set_volume(volume)
+
+    def _player(self):
+        return self.hcp.players[self.device_selector.get()]
+
+    def _current_player_info(self):
+        player = self.device_selector.get()
+        return [x for x in self.hcp.get_players() if x["name"] == player][0]
+
+
 
 async def run_tk(root, interval=0.05):
     '''
@@ -46,7 +116,8 @@ async def gui_thread():
 
 def start_hcp():
     global hcp
-    hcp = HeosClientProtocol(asyncio.get_event_loop(), halt=False)
+    global app
+    hcp = HeosClientProtocol(asyncio.get_event_loop(), halt=False, start_action=app.comms_up)
     return hcp
 
 async def main():

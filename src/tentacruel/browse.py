@@ -6,7 +6,6 @@ from . service import _HeosService
 class _HeosBrowse(_HeosService):
     prefix = "browse"
 
-
     def _get_player_id(self):
         return self.protocol._player_id
 

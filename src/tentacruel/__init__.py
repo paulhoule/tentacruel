@@ -43,11 +43,15 @@ class HeosClientProtocol(asyncio.Protocol):
 
         self.system = _HeosSystem(self)
         self.browse = _HeosBrowse(self)
-        self.player = _HeosPlayer(self)
+        self.players = {}
 
         self.inflight_commands = dict()
         self._sources = {}
         self._sequence = 1
+        self._listeners = []
+
+    def add_listener(self,listener):
+        self._listeners += [listener]
 
     def connection_made(self, transport):
         """
@@ -138,8 +142,8 @@ class HeosClientProtocol(asyncio.Protocol):
 
     # pylint: disable=no-self-use
     def _handle_event(self, event, message):
-        print("Got event" + event)
-        print(message)
+        for listener in self._listeners:
+            listener(event,message)
 
     def connection_lost(self, exc):
         self._loop.stop()
@@ -156,7 +160,9 @@ class HeosClientProtocol(asyncio.Protocol):
         :return:
         """
         await self.system.register_for_change_events()
-        self._players = await self.player.get_players()
+        self._players = await _HeosPlayer(self).get_players()
+        for player in self._players:
+            self.players[player["name"]]=_HeosPlayer(self,player["pid"])
 
         if self._start_action:
             await self._start_action(self)
@@ -164,6 +170,8 @@ class HeosClientProtocol(asyncio.Protocol):
         if self._halt:
             self._loop.stop()
 
+    def get_players(self):
+        return self._players
 
     def _run_command(self, command: str, arguments: dict = {}) -> asyncio.Future:
         future = self._loop.create_future()
@@ -175,8 +183,8 @@ class HeosClientProtocol(asyncio.Protocol):
         self.inflight_commands[command][this_event] = future
 
         base_url = f"heos://{command}"
-        #        if arguments:
-        #            arguments["SEQUENCE"]=this_event
+        if arguments:
+            arguments["SEQUENCE"]=this_event
 
         if arguments:
             url = base_url + "?" + "&".join(f"{key}={value}" for (key,value) in arguments.items())

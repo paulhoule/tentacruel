@@ -5,15 +5,13 @@ from . service import _HeosService
 class _HeosPlayer(_HeosService):
     prefix = "player"
 
-    def __init__(self,protocol):
+    def __init__(self,protocol,player_id=None):
+        super().__init__(protocol)
         self.play_states = {"stop", "pause", "play"}
         self.mute_states = {"on", "off"}
         self.repeat_states = {"on_all","on_one","off"}
         self.shuffle_states = {"on", "off"}
-        self.protocol=protocol
-
-    def _get_player_id(self):
-        return self.protocol._player_id
+        self._player_id = player_id
 
     async def get_players(self) -> Future:
         return await self._run(
@@ -22,7 +20,7 @@ class _HeosPlayer(_HeosService):
 
     async def get_player_info(self,pid = None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "get_player_info",
@@ -31,7 +29,7 @@ class _HeosPlayer(_HeosService):
 
     async def get_play_state(self,pid = None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "get_play_state",
@@ -40,10 +38,10 @@ class _HeosPlayer(_HeosService):
 
     async def set_play_state(self,state = "stop",pid = None,) -> Future:
         if state not in self.play_states:
-            raise ValueError(f"Play state must be one of {self.play_states}3 instead of {state}")
+            raise ValueError(f"Play state must be one of {self.play_states} instead of {state}")
 
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "set_play_state",
@@ -52,7 +50,7 @@ class _HeosPlayer(_HeosService):
 
     async def get_now_playing_media(self,pid = None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "get_now_playing_media",
@@ -61,7 +59,7 @@ class _HeosPlayer(_HeosService):
 
     async def get_volume(self,pid = None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "get_volume",
@@ -70,7 +68,7 @@ class _HeosPlayer(_HeosService):
 
     async def set_volume(self,level = 0,pid = None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "set_volume",
@@ -79,7 +77,7 @@ class _HeosPlayer(_HeosService):
 
     async def volume_up(self,pid = None,step = 5) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "volume_up",
@@ -88,7 +86,7 @@ class _HeosPlayer(_HeosService):
 
     async def volume_down(self,pid = None,step = 5) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "volume_down",
@@ -97,7 +95,7 @@ class _HeosPlayer(_HeosService):
 
     async def get_mute(self,pid = None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "get_mute",
@@ -109,7 +107,7 @@ class _HeosPlayer(_HeosService):
             raise ValueError(f"Mute state must be one of {self.mute_states} instead of {state}")
 
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "set_mute",
@@ -118,7 +116,7 @@ class _HeosPlayer(_HeosService):
 
     async def toggle_mute(self,pid = None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "toggle_mute",
@@ -127,7 +125,7 @@ class _HeosPlayer(_HeosService):
 
     async def get_play_mode(self,pid = None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "get_play_mode",
@@ -136,7 +134,7 @@ class _HeosPlayer(_HeosService):
 
     async def set_play_mode(self,repeat="off",shuffle="off",pid = None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         if repeat not in self.repeat_states:
             raise ValueError(f"Repeat state must be one of {self.repeat_states} instead of {repeat}")
@@ -151,7 +149,7 @@ class _HeosPlayer(_HeosService):
 
     async def get_queue(self,range=None,pid = None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         arguments = dict(pid = pid)
         if range:
@@ -164,7 +162,7 @@ class _HeosPlayer(_HeosService):
 
     async def play_queue(self,qid=1,pid = None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "play_queue",
@@ -173,7 +171,7 @@ class _HeosPlayer(_HeosService):
 
     async def remove_from_queue(self,qid=[],pid=None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         if not isinstance(qid,list):
             qid=list(qid)
@@ -189,7 +187,7 @@ class _HeosPlayer(_HeosService):
 
     async def save_queue(self,name: str,pid=None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         if not name or len(name)>128:
             raise ValueError("The playlist name must be less than 128 characters")
@@ -201,7 +199,7 @@ class _HeosPlayer(_HeosService):
 
     async def clear_queue(self,pid=None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "clear_queue",
@@ -210,7 +208,7 @@ class _HeosPlayer(_HeosService):
 
     async def play_next(self,pid=None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "play_next",
@@ -219,7 +217,7 @@ class _HeosPlayer(_HeosService):
 
     async def play_previous(self,pid=None) -> Future:
         if pid==None:
-            pid=self._get_player_id()
+            pid=self._player_id
 
         return await self._run(
             "play_previous",
