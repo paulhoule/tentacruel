@@ -49,9 +49,13 @@ class HeosClientProtocol(asyncio.Protocol):
         self._sources = {}
         self._sequence = 1
         self._listeners = []
+        self._progress_listeners = []
 
     def add_listener(self,listener):
         self._listeners += [listener]
+
+    def add_progress_listener(self, listener):
+        self._progress_listeners += [listener]
 
     def connection_made(self, transport):
         """
@@ -126,7 +130,6 @@ class HeosClientProtocol(asyncio.Protocol):
                 raise ValueError("Multiple matching futures found for command: " + command)
 
             if not jdata["heos"]["result"] == "success":
-                message = jdata["heos"]["message"]
                 message = {key: value[0] for key, value in
                            parse_qs(jdata["heos"]["message"]).items()}
                 future.set_exception(HeosError(message["eid"],message["text"]))
@@ -140,10 +143,20 @@ class HeosClientProtocol(asyncio.Protocol):
             elif payload:
                 future.set_result(payload)
 
+            self.update_progress_listeners()
+
     # pylint: disable=no-self-use
     def _handle_event(self, event, message):
         for listener in self._listeners:
             listener(event,message)
+
+    def update_progress_listeners(self):
+        count = 0
+        for command in self.inflight_commands.values():
+            count += len (command)
+        for listener in self._progress_listeners:
+            listener(count)
+
 
     def connection_lost(self, exc):
         self._loop.stop()
@@ -181,6 +194,7 @@ class HeosClientProtocol(asyncio.Protocol):
         if not command in self.inflight_commands:
             self.inflight_commands[command] = {}
         self.inflight_commands[command][this_event] = future
+        self.update_progress_listeners()
 
         base_url = f"heos://{command}"
         if arguments:

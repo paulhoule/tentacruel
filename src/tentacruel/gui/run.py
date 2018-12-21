@@ -1,4 +1,6 @@
 import tkinter as tk
+import tkinter.ttk as ttk
+
 import asyncio
 from functools import wraps
 from math import floor
@@ -23,6 +25,7 @@ class Application(tk.Frame):
         self._add("quit_button",tk.Button,text="Quit",command=self.quit,width=50,height=1)
         self._add("device_selector",tk.Spinbox,command=self.task(self.select_device))
         self._add("label",tk.Label,text="",width=50,height=1)
+        self._add("status",tk.Label,text="ok",width=50,background="green",foreground="white")
         self._add("now_playing", tk.Label, text="*** now playing ***", width=50, height=1,
                   background="black",foreground="white")
         self._add("song",tk.Label,text="",width=50,height=1)
@@ -46,17 +49,30 @@ class Application(tk.Frame):
 
         return wrapper
 
+    #
+    # handle events from the system we're controlling
+    #
+
+    async def comms_up(self,hcp):
+        print("in comms_up")
+        self.hcp = hcp
+        self.hcp.add_listener(self._handle_event)
+        self.hcp.add_progress_listener(self._handle_progress)
+        players = hcp.get_players()
+        self["device_selector"]["values"] = tuple(player["name"] for player in players)
+        await self.select_device()
+
     def _handle_event(self,event,message):
         if event=="/player_state_changed":
-            self._handle_state_changed(message)
+            self.handle_state_changed(message)
         elif event == "/player_volume_changed":
-            self._handle_volume_changed(message)
+            self.handle_volume_changed(message)
         elif event == "/player_playback_error":
-            self._handle_playback_error(message)
+            self.handle_playback_error(message)
         elif event == "/player_now_playing_changed":
-            asyncio.create_task(self._handle_now_playing_changed(message))
+            asyncio.create_task(self.handle_now_playing_changed(message))
         elif event == "/player_now_playing_progress":
-            self._handle_now_playing_progress(message)
+            self.handle_now_playing_progress(message)
         else:
             print("received event "+str(event))
 
@@ -65,34 +81,42 @@ class Application(tk.Frame):
         my_pid = int(self._current_player_info()["pid"])
         return (that_pid != my_pid)
 
-    def _handle_state_changed(self,message):
+    def handle_state_changed(self, message):
         if self.wrong_pid(message):
             return
-
         self["play_button"]["text"] = "Stop" if message["state"] == 'play' else "Play"
+        if message["state"] == 'play':
+            self.update_status("ok")
 
-    def _handle_volume_changed(self,message):
+    def handle_volume_changed(self, message):
         if self.wrong_pid(message):
             return
 
         self["volume"].set(message["level"])
 
-    def _handle_playback_error(self,message):
+    def handle_playback_error(self, message):
         if self.wrong_pid(message):
             return
-
+        self.update_status("error")
         print(message)
 
-    async def _handle_now_playing_changed(self,message):
+    def _handle_progress(self, count):
+        print(f"In flight command count is {count}")
+        if count==0:
+            self.update_status("ok")
+        else:
+            self.update_status("wait")
+
+    async def handle_now_playing_changed(self, message):
         if self.wrong_pid(message):
             return
 
         player = self._player()
         media = await player.get_now_playing_media()
         self.now_playing = media["payload"]
-        self._update_now_playing()
+        self.update_now_playing()
 
-    def _handle_now_playing_progress(self,message):
+    def handle_now_playing_progress(self, message):
         if self.wrong_pid(message):
             return
 
@@ -106,31 +130,12 @@ class Application(tk.Frame):
         sec = sec - 60 * min
         return f"{min}:{sec}"
 
-    def _update_now_playing(self):
-        self["song"]["text"]=self.now_playing["song"]
-        self["artist"]["text"]=self.now_playing["artist"]
-        self["album"]["text"]=self.now_playing["album"]
-
-    async def comms_up(self,hcp):
-        print("in comms_up")
-        self.hcp = hcp
-        self.hcp.add_listener(self._handle_event)
-        players = hcp.get_players()
-        self["device_selector"]["values"] = tuple(player["name"] for player in players)
-        await self.select_device()
 
     async def select_device(self):
         print("in select_device")
         player_info = self._current_player_info()
         self["label"]["text"] = player_info["model"]
-        await self._update_player()
-
-    async def _update_player(self):
-        player = self._player()
-        state = (await player.get_play_state())['state']
-        self["play_button"]["text"] = "Stop" if state=='play' else "Play"
-        volume = (await player.get_volume())["level"]
-        self["volume"].set(volume)
+        await self.update_player()
 
     async def play_command(self):
         player = self._player()
@@ -148,6 +153,33 @@ class Application(tk.Frame):
     def _current_player_info(self):
         player = self["device_selector"].get()
         return [x for x in self.hcp.get_players() if x["name"] == player][0]
+
+    #
+    # updaters update the GUI
+    #
+
+    def update_status(self,is_ok):
+        if is_ok=="ok":
+            self["status"]["text"]="ok"
+            self["status"]["background"]="green"
+        elif is_ok=="wait":
+            self["status"]["text"]="waiting"
+            self["status"]["background"]="yellow"
+        else:
+            self["status"]["text"]="error"
+            self["status"]["background"]="red"
+
+    async def update_player(self):
+        player = self._player()
+        state = (await player.get_play_state())['state']
+        self["play_button"]["text"] = "Stop" if state=='play' else "Play"
+        volume = (await player.get_volume())["level"]
+        self["volume"].set(volume)
+
+    def update_now_playing(self):
+        self["song"]["text"]=self.now_playing["song"]
+        self["artist"]["text"]=self.now_playing["artist"]
+        self["album"]["text"]=self.now_playing["album"]
 
 async def run_tk(root, interval=0.05):
     '''
