@@ -38,6 +38,11 @@ class Application(tk.Frame):
                   tk.Scale, from_=0, to=100.0, length = 200,
                   command = self.task(self.set_volume),
                   orient=tk.HORIZONTAL)
+        self.mute_status = tk.IntVar()
+        self._add("mute",tk.Checkbutton,
+                  command=self.task(self.set_mute),
+                  text = "Mute",
+                  variable = self.mute_status)
 
     def quit(self):
         self.alive = False
@@ -93,6 +98,7 @@ class Application(tk.Frame):
             return
 
         self["volume"].set(message["level"])
+        self.mute_status.set(1 if message["mute"] == 'on' else 0)
 
     def handle_playback_error(self, message):
         if self.wrong_pid(message):
@@ -143,9 +149,11 @@ class Application(tk.Frame):
         await player.set_play_state(new_state)
 
     async def set_volume(self,level):
-        print(level)
         volume = self["volume"].get()
         await self._player().set_volume(volume)
+
+    async def set_mute(self):
+        await self._player().set_mute(state = "on" if self.mute_status.get() else "off")
 
     def _player(self):
         return self.hcp.players[self["device_selector"].get()]
@@ -175,6 +183,8 @@ class Application(tk.Frame):
         self["play_button"]["text"] = "Stop" if state=='play' else "Play"
         volume = (await player.get_volume())["level"]
         self["volume"].set(volume)
+        mute = (await player.get_mute())["state"]
+        self.mute_status.set(mute)
 
     def update_now_playing(self):
         self["song"]["text"]=self.now_playing["song"]
