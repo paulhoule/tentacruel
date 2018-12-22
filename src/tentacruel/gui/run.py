@@ -2,10 +2,28 @@ import tkinter as tk
 import tkinter.ttk as ttk
 
 import asyncio
-from functools import wraps
 from math import floor
 
 from tentacruel import HeosClientProtocol, RECEIVER_IP, HEOS_PORT
+
+#
+# constant widget names
+#
+from tentacruel.gui.browser import SourceBrowser
+
+MUTE = "mute"
+PLAY_BUTTON = "play_button"
+BROWSE_BUTTON = "browse_button"
+PROGRESS = "progress"
+ARTIST = "artist"
+ALBUM = "album"
+SONG = "song"
+NOW_PLAYING = "now_playing"
+STATUS = "status"
+LABEL = "label"
+VOLUME = "volume"
+DEVICE_SELECTOR = "device_selector"
+QUIT_BUTTON = "quit_button"
 
 
 class Application(tk.Frame):
@@ -22,27 +40,33 @@ class Application(tk.Frame):
         self.alive = True
         self.grid()
         self._widgets={}
-        self._add("quit_button",tk.Button,text="Quit",command=self.quit,width=50,height=1)
-        self._add("device_selector",tk.Spinbox,command=self.task(self.select_device))
-        self._add("label",tk.Label,text="",width=50,height=1)
-        self._add("status",tk.Label,text="ok",width=50,background="green",foreground="white")
-        self._add("now_playing", tk.Label, text="*** now playing ***", width=50, height=1,
-                  background="black",foreground="white")
-        self._add("song",tk.Label,text="",width=50,height=1)
-        self._add("album",tk.Label,text="",width=50,height=1)
-        self._add("artist",tk.Label,text="",width=50,height=1)
-        self._add("progress",tk.Label,text="",width=50,height=1)
-        self._add("play_button", tk.Button, text="Play", width=50, height=1,
+        self.browser = None
+        self._add(QUIT_BUTTON, tk.Button, text="Quit", command=self.quit, width=50, height=1)
+        self._add(BROWSE_BUTTON, tk.Button, text="Browse", command=self.browse, width=50, height=1)
+        self._add(DEVICE_SELECTOR, tk.Spinbox, command=self.task(self.select_device))
+        self._add(LABEL, tk.Label, text="", width=50, height=1)
+        self._add(STATUS, tk.Label, text="ok", width=50, background="green", foreground="white")
+        self._add(NOW_PLAYING, tk.Label, text="*** now playing ***", width=50, height=1,
+                  background="black", foreground="white")
+        self._add(SONG, tk.Label, text="", width=50, height=1)
+        self._add(ALBUM, tk.Label, text="", width=50, height=1)
+        self._add(ARTIST, tk.Label, text="", width=50, height=1)
+        self._add(PROGRESS, tk.Label, text="", width=50, height=1)
+        self._add(PLAY_BUTTON, tk.Button, text="Play", width=50, height=1,
                   command=self.task(self.play_command))
-        self._add("volume",
+        self._add(VOLUME,
                   tk.Scale, from_=0, to=100.0, length = 200,
                   command = self.task(self.set_volume),
                   orient=tk.HORIZONTAL)
         self.mute_status = tk.IntVar()
-        self._add("mute",tk.Checkbutton,
+        self._add(MUTE, tk.Checkbutton,
                   command=self.task(self.set_mute),
                   text = "Mute",
                   variable = self.mute_status)
+
+    def browse(self):
+        self.browser = SourceBrowser(master=self, heos=self.hcp, width=500, height=100)
+        asyncio.create_task(self.browser.fill_source())
 
     def quit(self):
         self.alive = False
@@ -64,7 +88,7 @@ class Application(tk.Frame):
         self.hcp.add_listener(self._handle_event)
         self.hcp.add_progress_listener(self._handle_progress)
         players = hcp.get_players()
-        self["device_selector"]["values"] = tuple(player["name"] for player in players)
+        self[DEVICE_SELECTOR]["values"] = tuple(player["name"] for player in players)
         await self.select_device()
 
     def _handle_event(self,event,message):
@@ -89,7 +113,7 @@ class Application(tk.Frame):
     def handle_state_changed(self, message):
         if self.wrong_pid(message):
             return
-        self["play_button"]["text"] = "Stop" if message["state"] == 'play' else "Play"
+        self[PLAY_BUTTON]["text"] = "Stop" if message["state"] == 'play' else "Play"
         if message["state"] == 'play':
             self.update_status("ok")
 
@@ -97,7 +121,7 @@ class Application(tk.Frame):
         if self.wrong_pid(message):
             return
 
-        self["volume"].set(message["level"])
+        self[VOLUME].set(message["level"])
         self.mute_status.set(1 if message["mute"] == 'on' else 0)
 
     def handle_playback_error(self, message):
@@ -128,7 +152,7 @@ class Application(tk.Frame):
 
         cur_pos = self.to_min_sec(message["cur_pos"])
         duration = self.to_min_sec(message["duration"])
-        self["progress"]["text"] = f"{cur_pos} / {duration}"
+        self[PROGRESS]["text"] = f"{cur_pos} / {duration}"
 
     def to_min_sec(self,millisec):
         sec = float(millisec) / 1000.0
@@ -140,26 +164,26 @@ class Application(tk.Frame):
     async def select_device(self):
         print("in select_device")
         player_info = self._current_player_info()
-        self["label"]["text"] = player_info["model"]
+        self[LABEL]["text"] = player_info["model"]
         await self.update_player()
 
     async def play_command(self):
         player = self._player()
-        new_state = self["play_button"]["text"].lower()
+        new_state = self[PLAY_BUTTON]["text"].lower()
         await player.set_play_state(new_state)
 
     async def set_volume(self,level):
-        volume = self["volume"].get()
+        volume = self[VOLUME].get()
         await self._player().set_volume(volume)
 
     async def set_mute(self):
         await self._player().set_mute(state = "on" if self.mute_status.get() else "off")
 
     def _player(self):
-        return self.hcp.players[self["device_selector"].get()]
+        return self.hcp.players[self[DEVICE_SELECTOR].get()]
 
     def _current_player_info(self):
-        player = self["device_selector"].get()
+        player = self[DEVICE_SELECTOR].get()
         return [x for x in self.hcp.get_players() if x["name"] == player][0]
 
     #
@@ -168,28 +192,28 @@ class Application(tk.Frame):
 
     def update_status(self,is_ok):
         if is_ok=="ok":
-            self["status"]["text"]="ok"
-            self["status"]["background"]="green"
+            self[STATUS]["text"]="ok"
+            self[STATUS]["background"]="green"
         elif is_ok=="wait":
-            self["status"]["text"]="waiting"
-            self["status"]["background"]="yellow"
+            self[STATUS]["text"]="waiting"
+            self[STATUS]["background"]="yellow"
         else:
-            self["status"]["text"]="error"
-            self["status"]["background"]="red"
+            self[STATUS]["text"]="error"
+            self[STATUS]["background"]="red"
 
     async def update_player(self):
         player = self._player()
         state = (await player.get_play_state())['state']
-        self["play_button"]["text"] = "Stop" if state=='play' else "Play"
+        self[PLAY_BUTTON]["text"] = "Stop" if state=='play' else "Play"
         volume = (await player.get_volume())["level"]
-        self["volume"].set(volume)
+        self[VOLUME].set(volume)
         mute = (await player.get_mute())["state"]
         self.mute_status.set(mute)
 
     def update_now_playing(self):
-        self["song"]["text"]=self.now_playing["song"]
-        self["artist"]["text"]=self.now_playing["artist"]
-        self["album"]["text"]=self.now_playing["album"]
+        self[SONG]["text"]=self.now_playing["song"]
+        self[ARTIST]["text"]=self.now_playing["artist"]
+        self[ALBUM]["text"]=self.now_playing["album"]
 
 async def run_tk(root, interval=0.05):
     '''
