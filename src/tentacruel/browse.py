@@ -17,10 +17,13 @@ class _HeosBrowse(_HeosService):
             dict(sid=sid)
         )
 
-    async def browse(self, sid:int, cid:str = None) -> Future:
+    async def browse(self, sid:int, cid:str = None, range = None) -> Future:
         args = {"sid":sid}
         if cid:
             args["cid"] = cid
+
+        if range:
+            args["range"] = range
 
         return await self._run("browse",
             args

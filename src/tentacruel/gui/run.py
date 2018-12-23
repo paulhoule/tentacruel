@@ -9,7 +9,7 @@ from tentacruel import HeosClientProtocol, RECEIVER_IP, HEOS_PORT
 #
 # constant widget names
 #
-from tentacruel.gui.browser import SourceBrowser
+from tentacruel.gui.browser import SourceBrowser, GeneralBrowser
 
 MUTE = "mute"
 PLAY_BUTTON = "play_button"
@@ -40,7 +40,7 @@ class Application(tk.Frame):
         self.alive = True
         self.grid()
         self._widgets={}
-        self.browser = None
+        self.browsers = {}
         self._add(QUIT_BUTTON, tk.Button, text="Quit", command=self.quit, width=50, height=1)
         self._add(BROWSE_BUTTON, tk.Button, text="Browse", command=self.browse, width=50, height=1)
         self._add(DEVICE_SELECTOR, tk.Spinbox, command=self.task(self.select_device))
@@ -64,9 +64,22 @@ class Application(tk.Frame):
                   text = "Mute",
                   variable = self.mute_status)
 
-    def browse(self):
-        self.browser = SourceBrowser(master=self, heos=self.hcp, width=500, height=100)
-        asyncio.create_task(self.browser.fill_source())
+    def browse(self,sid=None,cid=None):
+        if (sid,cid) in self.browsers:
+            self.browsers[sid,cid].lift()
+        else:
+            browser = self.create_browser(sid, cid)
+            self.browsers[sid,cid] = browser
+            asyncio.create_task(browser.fill_source())
+
+    def unregister_browser(self,sid, cid):
+        del self.browsers[sid,cid]
+
+    def create_browser(self, sid, cid):
+        if not (sid or cid):
+            return SourceBrowser(master=self, width=500, height=100)
+        else:
+            return GeneralBrowser(sid,cid,master=self, width=500, height=100)
 
     def quit(self):
         self.alive = False

@@ -1,0 +1,11 @@
+{
+  "container": "no",
+  "mid": "m-2e55f82f-9be3-4d01-3588-b93ff4e254ec/fol/Bugle_Calls/ChurchCall.mp3",
+  "type": "song",
+  "artist": "",
+  "album": "",
+  "album_id": "m-2e55f82f-9be3-4d01-3588-b93ff4e254ec/fol/Bugle_Calls",
+  "playable": "yes",
+  "name": "church call",
+  "image_url": "http://192.168.0.33:8015//m-browsableMediaUri/getImageFromTag/mnt/sda1/Bugle_Calls/PaydayMarch.mp3"
+}
