@@ -81,6 +81,16 @@ class Application(tk.Frame):
         else:
             return GeneralBrowser(sid,cid,master=self, width=500, height=100)
 
+    def play_item(self,sid=None,cid=None,mid=None):
+        identifiers = {}
+        if sid:
+            identifiers["sid"] = sid
+        if cid:
+            identifiers["cid"] = cid
+        if mid:
+            identifiers["mid"] = mid
+        self.self._player()
+
     def quit(self):
         self.alive = False
         super().quit()

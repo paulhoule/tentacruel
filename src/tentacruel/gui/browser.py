@@ -7,8 +7,25 @@ HEADER = "header"
 def LINE(number):
     return f"line{number}"
 
+def LABEL(number):
+    return f"label{number}"
+
+def PLAY(number):
+    return f"play{number}"
+
+def TYPE(number):
+    return f"type{number}"
+
+def BROWSE(number):
+    return f"browse{number}"
+
+# see https://docs.arangodb.com/3.4/AQL/Functions/Document.html#keep
 def keep(source:Dict,keep_keys: Set):
     return {key: value for (key,value) in source.items() if key in keep_keys}
+
+# see https://docs.arangodb.com/3.4/AQL/Functions/Document.html#unset
+def discard(source:Dict,discard_keys: Set):
+    return {key: value for (key,value) in source.items() if key not in discard_keys}
 
 class SourceBrowser(tk.Toplevel):
     def _add(self,name,widget_type,*args,**kwargs):
@@ -69,8 +86,11 @@ class SourceBrowser(tk.Toplevel):
 
 class GeneralBrowser(tk.Toplevel):
     def _add(self,name,widget_type,*args,**kwargs):
-        widget = widget_type(self,*args,**kwargs)
-        widget.grid()
+        grid_args = {"column","columnspan","row","rowspan"}
+        gridkw = keep(kwargs,grid_args)
+        widgetkw = discard(kwargs,grid_args)
+        widget = widget_type(self,*args,**widgetkw)
+        widget.grid(**gridkw)
         self._widgets[name]=(widget)
 
     def __getitem__(self,name):
@@ -95,7 +115,7 @@ class GeneralBrowser(tk.Toplevel):
 
         self._widgets={}
         self.grid()
-        self._add(HEADER, tk.Label, text="Music Sources", width=100, height=1)
+        self._add(HEADER, tk.Label, text="Music Sources", width=100, height=1,columnspan=4)
         self.lift()
 
     async def fill_source(self):
@@ -109,12 +129,39 @@ class GeneralBrowser(tk.Toplevel):
             print(item)
             keys = keep(item,{"cid","mid"})
             keys["sid"] = self.coordinates["sid"]
+            if item.get("container","no")=="yes":
+                self._add(BROWSE(i),
+                    tk.Button,
+                    text = "Browse",
+                    command=self.browse_to_item(**keys),
+                    row = i+1,
+                    column = 0
+                )
+
+            if item.get("playable","no")=="yes":
+                self._add(PLAY(i),
+                     tk.Button,
+                     text="Play",
+                     row=i + 1,
+                     column=1
+                )
+
+            if "type" in item:
+                self._add(TYPE(i),
+                    tk.Button,
+                    text = item["type"],
+                    row=i+1,
+                    column=2
+                )
+
             self._add(LINE(i),
                 tk.Button,
                 text=item["name"],
                 width=100,height=1,
                 bg="white" if i % 2 else "lightgrey",
-                command=self.browse_to_item(**keys)
+                command=self.browse_to_item(**keys),
+                row = i+1,
+                column = 3
             )
 
     def browse_to_item(self,sid=None,cid=None,mid=None):
@@ -122,6 +169,12 @@ class GeneralBrowser(tk.Toplevel):
             self.master.browse(sid,cid)
 
         return click_handler
+
+    def play_item(self,sid=None,cid=None,mid=None):
+        def click_handler():
+            asyncio.create_task(self.master.play_item(sid,cid,mid))
+
+        return click_handler()
 
 
 
