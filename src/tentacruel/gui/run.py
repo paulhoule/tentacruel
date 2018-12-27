@@ -81,7 +81,7 @@ class Application(tk.Frame):
         else:
             return GeneralBrowser(sid,cid,master=self, width=500, height=100)
 
-    def play_item(self,sid=None,cid=None,mid=None):
+    async def play_item(self,sid=None,cid=None,mid=None):
         identifiers = {}
         if sid:
             identifiers["sid"] = sid
@@ -89,7 +89,7 @@ class Application(tk.Frame):
             identifiers["cid"] = cid
         if mid:
             identifiers["mid"] = mid
-        self.self._player()
+        await self._player().add_to_queue(sid,cid,mid)
 
     def quit(self):
         self.alive = False

@@ -197,8 +197,8 @@ class HeosClientProtocol(asyncio.Protocol):
         self.update_progress_listeners()
 
         base_url = f"heos://{command}"
-        if arguments:
-            arguments["SEQUENCE"]=this_event
+#        if arguments:
+#            arguments["SEQUENCE"]=this_event
 
         if arguments:
             url = base_url + "?" + "&".join(f"{key}={value}" for (key,value) in arguments.items())

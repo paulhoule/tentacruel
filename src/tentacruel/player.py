@@ -160,13 +160,37 @@ class _HeosPlayer(_HeosService):
             arguments= arguments
         )
 
+    async def add_to_queue(self,sid=None,cid=None,mid=None,aid=None,pid=None):
+        if pid==None:
+            pid=self._player_id
+
+        if aid==None:
+            aid=4
+
+        arguments = dict(
+            pid=pid,
+            aid=aid
+        )
+        if sid:
+            arguments["sid"] = sid
+        if cid:
+            arguments["cid"] = cid
+        if mid:
+            arguments["mid"] = mid
+
+        print(arguments)
+        return await self._run(
+            "add_to_queue",
+            arguments = arguments
+        )
+
     async def play_queue(self,qid=1,pid = None) -> Future:
         if pid==None:
             pid=self._player_id
 
         return await self._run(
             "play_queue",
-            arguments= dict(pid=pid,qid=qid)
+            arguments = dict(pid=pid,qid=qid)
         )
 
     async def remove_from_queue(self,qid=[],pid=None) -> Future:

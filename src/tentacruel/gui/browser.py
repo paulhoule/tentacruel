@@ -129,6 +129,9 @@ class GeneralBrowser(tk.Toplevel):
             print(item)
             keys = keep(item,{"cid","mid"})
             keys["sid"] = self.coordinates["sid"]
+            if "cid" not in keys:
+                keys["cid"] = self.coordinates["cid"]
+
             if item.get("container","no")=="yes":
                 self._add(BROWSE(i),
                     tk.Button,
@@ -140,15 +143,16 @@ class GeneralBrowser(tk.Toplevel):
 
             if item.get("playable","no")=="yes":
                 self._add(PLAY(i),
-                     tk.Button,
-                     text="Play",
-                     row=i + 1,
-                     column=1
+                    tk.Button,
+                    command=self.play_item(**keys),
+                    text="Play",
+                    row=i + 1,
+                    column=1
                 )
 
             if "type" in item:
                 self._add(TYPE(i),
-                    tk.Button,
+                    tk.Label,
                     text = item["type"],
                     row=i+1,
                     column=2
@@ -174,7 +178,7 @@ class GeneralBrowser(tk.Toplevel):
         def click_handler():
             asyncio.create_task(self.master.play_item(sid,cid,mid))
 
-        return click_handler()
+        return click_handler
 
 
 
