@@ -1,18 +1,24 @@
 import tkinter as tk
-import tkinter.ttk as ttk
 
 import asyncio
+import json
+from logging import getLogger
 from math import floor
 
 from tentacruel import HeosClientProtocol, RECEIVER_IP, HEOS_PORT
+from tentacruel.gui import ManagedGridFrame
+from tentacruel.gui.browser import SourceBrowser, GeneralBrowser
 
+logger = getLogger(__name__)
 #
 # constant widget names
 #
-from tentacruel.gui.browser import SourceBrowser, GeneralBrowser
+
 
 MUTE = "mute"
 PLAY_BUTTON = "play_button"
+PREV_BUTTON = "prev_button"
+NEXT_BUTTON = "next_button"
 BROWSE_BUTTON = "browse_button"
 PROGRESS = "progress"
 ARTIST = "artist"
@@ -26,43 +32,45 @@ DEVICE_SELECTOR = "device_selector"
 QUIT_BUTTON = "quit_button"
 
 
-class Application(tk.Frame):
-    def _add(self,name,widget_type,*args,**kwargs):
-        widget = widget_type(self,*args,**kwargs)
-        widget.grid()
-        self._widgets[name]=(widget)
-
-    def __getitem__(self,name):
-        return self._widgets[name]
+class Application(ManagedGridFrame):
 
     def __init__(self, master=None):
-        tk.Frame.__init__(self, master)
+        super().__init__(self, master)
         self.alive = True
-        self.grid()
-        self._widgets={}
         self.browsers = {}
-        self._add(QUIT_BUTTON, tk.Button, text="Quit", command=self.quit, width=50, height=1)
-        self._add(BROWSE_BUTTON, tk.Button, text="Browse", command=self.browse, width=50, height=1)
-        self._add(DEVICE_SELECTOR, tk.Spinbox, command=self.task(self.select_device))
-        self._add(LABEL, tk.Label, text="", width=50, height=1)
-        self._add(STATUS, tk.Label, text="ok", width=50, background="green", foreground="white")
-        self._add(NOW_PLAYING, tk.Label, text="*** now playing ***", width=50, height=1,
-                  background="black", foreground="white")
-        self._add(SONG, tk.Label, text="", width=50, height=1)
-        self._add(ALBUM, tk.Label, text="", width=50, height=1)
-        self._add(ARTIST, tk.Label, text="", width=50, height=1)
-        self._add(PROGRESS, tk.Label, text="", width=50, height=1)
-        self._add(PLAY_BUTTON, tk.Button, text="Play", width=50, height=1,
-                  command=self.task(self.play_command))
+
+        self._add(QUIT_BUTTON, tk.Button, text="Quit", command=self.quit, width=15, height=1,
+                  columnspan=1)
+        self._add(DEVICE_SELECTOR, tk.Spinbox, command=self.task(self.select_device),
+                  columnspan=2)
+        self._add(BROWSE_BUTTON, tk.Button, text="Browse", command=self.browse, width=15, height=1,
+                  columnspan=1)
+
+        self._add(LABEL, tk.Label, text="", width=50, height=1,columnspan=4)
+        self._add(STATUS, tk.Label, text="ok", width=50, background="green", foreground="white",
+                  columnspan=4)
+        self._add(SONG+"_label", tk.Label,text="Song:",width=15,anchor='e')
+        self._add(SONG, tk.Label, text="", width=50, height=1,columnspan=3,anchor='w')
+        self._add(ALBUM+"_label", tk.Label,text="Album:",width=15,anchor='e')
+        self._add(ALBUM, tk.Label, text="", width=50, height=1,columnspan=3,anchor='w')
+        self._add(ARTIST+"_label", tk.Label,text="Artist:",width=15,anchor='e')
+        self._add(ARTIST, tk.Label, text="", width=50, height=1,columnspan=3,anchor='w')
+        self._add(PROGRESS, tk.Label, text="", width=50, height=1,columnspan=4)
+        self._add(PREV_BUTTON, tk.Button, text="Prev", width=15, height=1)
+        self._add(PLAY_BUTTON, tk.Button, text="Play", width=30, height=1,
+                  columnspan=2,
+                   command=self.task(self.play_command))
+        self._add(NEXT_BUTTON, tk.Button, text="Next", width=15, height=1)
         self._add(VOLUME,
                   tk.Scale, from_=0, to=100.0, length = 200,
                   command = self.task(self.set_volume),
+                  columnspan=4,
                   orient=tk.HORIZONTAL)
         self.mute_status = tk.IntVar()
-        self._add(MUTE, tk.Checkbutton,
-                  command=self.task(self.set_mute),
-                  text = "Mute",
-                  variable = self.mute_status)
+        # self._add(MUTE, tk.Checkbutton,
+        #           command=self.task(self.set_mute),
+        #           text = "Mute",
+        #           variable = self.mute_status)
 
     def browse(self,sid=None,cid=None):
         if (sid,cid) in self.browsers:
@@ -106,7 +114,7 @@ class Application(tk.Frame):
     #
 
     async def comms_up(self,hcp):
-        print("in comms_up")
+        logger.debug("in comms_up")
         self.hcp = hcp
         self.hcp.add_listener(self._handle_event)
         self.hcp.add_progress_listener(self._handle_progress)
@@ -126,7 +134,7 @@ class Application(tk.Frame):
         elif event == "/player_now_playing_progress":
             self.handle_now_playing_progress(message)
         else:
-            print("received event "+str(event))
+            logger.debug("received event %s",event)
 
     def wrong_pid(self,message):
         that_pid = int(message["pid"])
@@ -151,10 +159,10 @@ class Application(tk.Frame):
         if self.wrong_pid(message):
             return
         self.update_status("error")
-        print(message)
+        logger.error(message)
 
     def _handle_progress(self, count):
-        print(f"In flight command count is {count}")
+        logger.debug(f"In flight command count is %s",count)
         if count==0:
             self.update_status("ok")
         else:
@@ -185,7 +193,7 @@ class Application(tk.Frame):
 
 
     async def select_device(self):
-        print("in select_device")
+        logger.debug("in select_device")
         player_info = self._current_player_info()
         self[LABEL]["text"] = player_info["model"]
         await self.update_player()
@@ -232,6 +240,8 @@ class Application(tk.Frame):
         self[VOLUME].set(volume)
         mute = (await player.get_mute())["state"]
         self.mute_status.set(mute)
+        q = await player.get_queue()
+        print(json.dumps(q,indent=2))
 
     def update_now_playing(self):
         self[SONG]["text"]=self.now_playing["song"]

@@ -178,7 +178,6 @@ class _HeosPlayer(_HeosService):
         if mid:
             arguments["mid"] = mid
 
-        print(arguments)
         return await self._run(
             "add_to_queue",
             arguments = arguments

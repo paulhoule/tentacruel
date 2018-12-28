@@ -2,7 +2,9 @@ import asyncio
 import json
 import tkinter as tk
 from typing import Dict, Set
+from logging import getLogger
 
+logger = getLogger(__name__)
 HEADER = "header"
 def LINE(number):
     return f"line{number}"
@@ -18,14 +20,6 @@ def TYPE(number):
 
 def BROWSE(number):
     return f"browse{number}"
-
-# see https://docs.arangodb.com/3.4/AQL/Functions/Document.html#keep
-def keep(source:Dict,keep_keys: Set):
-    return {key: value for (key,value) in source.items() if key in keep_keys}
-
-# see https://docs.arangodb.com/3.4/AQL/Functions/Document.html#unset
-def discard(source:Dict,discard_keys: Set):
-    return {key: value for (key,value) in source.items() if key not in discard_keys}
 
 class SourceBrowser(tk.Toplevel):
     def _add(self,name,widget_type,*args,**kwargs):
@@ -57,13 +51,11 @@ class SourceBrowser(tk.Toplevel):
         services = [source for source in sources if source["type"]=="heos_server"]
         sources2 = await self.heos().browse.browse(sid=services[0]["sid"])
         sources3 = await self.heos().browse.browse(sid=1027)
-        print(sources3)
         available_sources = [source for source in sources if
                              source["available"]=="true" and source["type"]!="heos_server"]
         available_sources += sources2["payload"]
         available_sources += sources3["payload"]
 
-        print(json.dumps(available_sources,indent=2))
         for i in range(len(available_sources)):
             source = available_sources[i]
             self._add(LINE(i),
@@ -126,7 +118,6 @@ class GeneralBrowser(tk.Toplevel):
         items = result["payload"]
         for i in range(len(items)):
             item = items[i]
-            print(item)
             keys = keep(item,{"cid","mid"})
             keys["sid"] = self.coordinates["sid"]
             if "cid" not in keys:

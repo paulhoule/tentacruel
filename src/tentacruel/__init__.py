@@ -5,9 +5,8 @@ Module to control Denon/Marantz
 import asyncio
 import json
 from json import JSONDecodeError
-from typing import Coroutine
-from urllib.parse import parse_qs, urlencode
 from urllib.parse import parse_qs
+from logging import getLogger
 
 from tentacruel.service import _HeosService
 from tentacruel.system import _HeosSystem
@@ -22,6 +21,8 @@ PLAYLISTS = 1025
 HISTORY = 1026
 AUX = 1027
 FAVORITES = 1028
+
+logger = getLogger(__name__)
 
 class HeosError(Exception):
     def __init__(self,error_id,message):
@@ -90,7 +91,7 @@ class HeosClientProtocol(asyncio.Protocol):
                 jdata = json.loads(packet)
                 self._handle_response(jdata)
             except JSONDecodeError:
-                print("Error parsing " + jdata + " as json")
+                logger.error("Error parsing %s  as json",jdata)
 
     def _handle_response(self, jdata):
         """
@@ -117,12 +118,12 @@ class HeosClientProtocol(asyncio.Protocol):
             if "SEQUENCE" in message:
                 sequence = int(message["SEQUENCE"])
                 future = futures[sequence]
-                print("Removing " + str(future))
+                logger.debug("Removing %s",future)
                 del futures[sequence]
             elif len(futures) == 1:
                 key = list(futures.keys())[0]
                 future = futures[key]
-                print("Removing " + str(future))
+                logger.debug("Removing %s",future)
                 del futures[key]
             elif not futures:
                 raise ValueError("No future found to match command: " + command)
@@ -197,15 +198,15 @@ class HeosClientProtocol(asyncio.Protocol):
         self.update_progress_listeners()
 
         base_url = f"heos://{command}"
-#        if arguments:
-#            arguments["SEQUENCE"]=this_event
+        if arguments:
+            arguments["SEQUENCE"]=this_event
 
         if arguments:
             url = base_url + "?" + "&".join(f"{key}={value}" for (key,value) in arguments.items())
         else:
             url = base_url
 
-        print("Sending command " + url)
+        logger.debug("Sending command %s", url)
         cmd = url + "\r\n"
         self.transport.write(cmd.encode("utf-8"))
 
