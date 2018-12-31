@@ -7,7 +7,7 @@ from math import floor
 
 from tentacruel import HeosClientProtocol, RECEIVER_IP, HEOS_PORT
 from tentacruel.gui import ManagedGridFrame
-from tentacruel.gui.browser import SourceBrowser, GeneralBrowser
+from tentacruel.gui.browser import SourceBrowser, GeneralBrowser, wrap_window, PlaylistBrowser
 
 logger = getLogger(__name__)
 #
@@ -20,6 +20,7 @@ PLAY_BUTTON = "play_button"
 PREV_BUTTON = "prev_button"
 NEXT_BUTTON = "next_button"
 BROWSE_BUTTON = "browse_button"
+PLAYLIST_BUTTON = "playlist_button"
 PROGRESS = "progress"
 ARTIST = "artist"
 ALBUM = "album"
@@ -35,7 +36,7 @@ QUIT_BUTTON = "quit_button"
 class Application(ManagedGridFrame):
 
     def __init__(self, master=None):
-        super().__init__(self, master)
+        super().__init__(master)
         self.alive = True
         self.browsers = {}
 
@@ -46,7 +47,9 @@ class Application(ManagedGridFrame):
         self._add(BROWSE_BUTTON, tk.Button, text="Browse", command=self.browse, width=15, height=1,
                   columnspan=1)
 
-        self._add(LABEL, tk.Label, text="", width=50, height=1,columnspan=4)
+        self._add(LABEL, tk.Label, text="", width=50, height=1,columnspan=3)
+        self._add(PLAYLIST_BUTTON, tk.Button, text="Playlist", width=15, height=1, columnspan=1
+                  ,command=self.playlist)
         self._add(STATUS, tk.Label, text="ok", width=50, background="green", foreground="white",
                   columnspan=4)
         self._add(SONG+"_label", tk.Label,text="Song:",width=15,anchor='e')
@@ -67,10 +70,10 @@ class Application(ManagedGridFrame):
                   columnspan=4,
                   orient=tk.HORIZONTAL)
         self.mute_status = tk.IntVar()
-        # self._add(MUTE, tk.Checkbutton,
-        #           command=self.task(self.set_mute),
-        #           text = "Mute",
-        #           variable = self.mute_status)
+        self._add(MUTE, tk.Checkbutton,
+                  command=self.task(self.set_mute),
+                  text = "Mute",
+                  variable = self.mute_status)
 
     def browse(self,sid=None,cid=None):
         if (sid,cid) in self.browsers:
@@ -80,14 +83,24 @@ class Application(ManagedGridFrame):
             self.browsers[sid,cid] = browser
             asyncio.create_task(browser.fill_source())
 
+    def playlist(self):
+        my_pid = int(self._current_player_info()["pid"])
+        playlist = wrap_window(self,PlaylistBrowser,frame_arguments={"pid": my_pid},width=500, height=100)
+        asyncio.create_task(playlist.fill_source())
+
     def unregister_browser(self,sid, cid):
         del self.browsers[sid,cid]
 
     def create_browser(self, sid, cid):
         if not (sid or cid):
-            return SourceBrowser(master=self, width=500, height=100)
+            return wrap_window(self,SourceBrowser,width=500, height=100)
         else:
-            return GeneralBrowser(sid,cid,master=self, width=500, height=100)
+            return wrap_window(self,GeneralBrowser,
+                               frame_arguments={
+                                   "sid": sid,
+                                   "cid": cid
+                               },
+                               width=500, height=100)
 
     async def play_item(self,sid=None,cid=None,mid=None):
         identifiers = {}

@@ -4,6 +4,8 @@ import tkinter as tk
 from typing import Dict, Set
 from logging import getLogger
 
+from tentacruel.gui import ManagedGridFrame, keep, discard
+
 logger = getLogger(__name__)
 HEADER = "header"
 def LINE(number):
@@ -21,30 +23,15 @@ def TYPE(number):
 def BROWSE(number):
     return f"browse{number}"
 
-class SourceBrowser(tk.Toplevel):
-    def _add(self,name,widget_type,*args,**kwargs):
-        widget = widget_type(self,*args,**kwargs)
-        widget.grid()
-        self._widgets[name]=(widget)
 
-    def __getitem__(self,name):
-        return self._widgets[name]
-
-    def task(self,that):
-        def wrapper(*args,**kwargs):
-            asyncio.create_task(that(*args,**kwargs))
-
-        return wrapper
-
+class SourceBrowser(ManagedGridFrame):
     def heos(self):
-        return self.master.hcp
+        return self._application.hcp
 
-    def __init__(self, heos=None, **kwargs):
-        tk.Toplevel.__init__(self, **kwargs)
-        self._widgets={}
-        self.grid()
+    def __init__(self, master=None, application=None, **kwargs):
+        super().__init__(master=master,columns=1,**kwargs)
+        self._application=application
         self._add(HEADER, tk.Label, text="Music Sources", width=100, height=1)
-        self.lift()
 
     async def fill_source(self):
         sources = await self.heos().browse.get_music_sources()
@@ -68,47 +55,28 @@ class SourceBrowser(tk.Toplevel):
 
     def browse_to_source(self,sid):
         def click_handler():
-            self.master.browse(sid)
+            self._application.browse(sid)
 
         return click_handler
 
     def destroy(self):
-        self.master.unregister_browser(None,None)
+        self._application.unregister_browser(None,None)
         super().destroy()
 
-class GeneralBrowser(tk.Toplevel):
-    def _add(self,name,widget_type,*args,**kwargs):
-        grid_args = {"column","columnspan","row","rowspan"}
-        gridkw = keep(kwargs,grid_args)
-        widgetkw = discard(kwargs,grid_args)
-        widget = widget_type(self,*args,**widgetkw)
-        widget.grid(**gridkw)
-        self._widgets[name]=(widget)
-
-    def __getitem__(self,name):
-        return self._widgets[name]
-
-    def task(self,that):
-        def wrapper(*args,**kwargs):
-            asyncio.create_task(that(*args,**kwargs))
-
-        return wrapper
-
+class GeneralBrowser(ManagedGridFrame):
     def heos(self):
-        return self.master.hcp
+        return self._application.hcp
 
-    def __init__(self, sid, cid, **kwargs):
-        tk.Toplevel.__init__(self, **kwargs)
+    def __init__(self, sid, cid, application=None, **kwargs):
+        super().__init__(columns=4,**kwargs)
+        self._application = application
         self.coordinates = {}
         if sid:
             self.coordinates["sid"]=sid
         if cid:
             self.coordinates["cid"]=cid
 
-        self._widgets={}
-        self.grid()
         self._add(HEADER, tk.Label, text="Music Sources", width=100, height=1,columnspan=4)
-        self.lift()
 
     async def fill_source(self):
         query = self.coordinates.copy()
@@ -161,15 +129,44 @@ class GeneralBrowser(tk.Toplevel):
 
     def browse_to_item(self,sid=None,cid=None,mid=None):
         def click_handler():
-            self.master.browse(sid,cid)
+            self._application.browse(sid,cid)
 
         return click_handler
 
     def play_item(self,sid=None,cid=None,mid=None):
         def click_handler():
-            asyncio.create_task(self.master.play_item(sid,cid,mid))
+            asyncio.create_task(self._application.play_item(sid,cid,mid))
 
         return click_handler
+
+class PlaylistBrowser(ManagedGridFrame):
+    def heos(self):
+        return self._application.hcp
+
+    def __init__(self, pid, application=None, **kwargs):
+        super().__init__(columns=4,**kwargs)
+        self._application = application
+        self._pid = pid
+
+        self._add(HEADER, tk.Label, text="Playlist", width=100, height=1,columnspan=4)
+
+    async def fill_source(self):
+        result = await self.heos()[self._pid].get_queue()
+        items = result["payload"]
+        for i in range(len(items)):
+            item = items[i]
+            self._add(f"qid_{i}",tk.Label,text=item["qid"])
+            self._add(f"song_{i}",tk.Label,text=item["song"])
+            self._add(f"album_{i}",tk.Label,text=item["album"])
+            self._add(f"artist_{i}",tk.Label,text=item["artist"])
+
+
+def wrap_window(master,inner_frame,frame_arguments={},**kwargs):
+    window = tk.Toplevel(master=master,**kwargs)
+    window.grid()
+    that = inner_frame(master=window,application=master,**frame_arguments)
+    that.grid()
+    return that
 
 
 

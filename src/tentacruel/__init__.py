@@ -187,6 +187,15 @@ class HeosClientProtocol(asyncio.Protocol):
     def get_players(self):
         return self._players
 
+    def __getitem__(self,that):
+        for name,player in self.players.items():
+            if that==name:
+                return player
+            if str(player._player_id) == str(that):
+                return player
+        raise KeyError(f"Couldn't find player with key {that}")
+
+
     def _run_command(self, command: str, arguments: dict = {}) -> asyncio.Future:
         future = self._loop.create_future()
         this_event = self._sequence

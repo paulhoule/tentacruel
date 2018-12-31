@@ -1,3 +1,4 @@
+import asyncio
 from tkinter import Frame
 
 # see https://docs.arangodb.com/3.4/AQL/Functions/Document.html#keep
@@ -19,13 +20,19 @@ class ManagedGridFrame(Frame):
         master=None,
         cnf={},
         columns = 4,
-    **kw):
-        Frame.__init__(master,cnf,**kw)
+        **kw):
+        Frame.__init__(self,master,cnf,**kw)
         self._columns = columns
         self._col=0
         self._row=0
         self._widgets = {}
         self.grid()
+
+    def task(self,that):
+        def wrapper(*args,**kwargs):
+            asyncio.create_task(that(*args,**kwargs))
+
+        return wrapper
 
     def _add(self,name,widget_type,*args,**kwargs):
         grid_args = {"column","columnspan","row","rowspan"}
