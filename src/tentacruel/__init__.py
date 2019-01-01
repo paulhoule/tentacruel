@@ -103,6 +103,7 @@ class HeosClientProtocol(asyncio.Protocol):
         :param jdata: a dict containing a parsed response Packet
         :return:
         """
+        logger.debug(jdata)
         command = jdata["heos"]["command"]
 
         if command.startswith("event/"):

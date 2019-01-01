@@ -147,19 +147,37 @@ class PlaylistBrowser(ManagedGridFrame):
         super().__init__(columns=4,**kwargs)
         self._application = application
         self._pid = pid
+        self._qid = None
+        self._items = []
+        self._rows = []
 
         self._add(HEADER, tk.Label, text="Playlist", width=100, height=1,columnspan=4)
 
     async def fill_source(self):
         result = await self.heos()[self._pid].get_queue()
-        items = result["payload"]
-        for i in range(len(items)):
-            item = items[i]
-            self._add(f"qid_{i}",tk.Label,text=item["qid"])
-            self._add(f"song_{i}",tk.Label,text=item["song"])
-            self._add(f"album_{i}",tk.Label,text=item["album"])
-            self._add(f"artist_{i}",tk.Label,text=item["artist"])
+        self._items = result["payload"]
+        for i in range(len(self._items)):
+            item = self._items[i]
+            self._rows.append([
+                self._add(f"qid_{i}",tk.Label,text=item["qid"],sticky="ew"),
+                self._add(f"song_{i}",tk.Label,text=item["song"],sticky="ew"),
+                self._add(f"album_{i}",tk.Label,text=item["album"],sticky="ew"),
+                self._add(f"artist_{i}",tk.Label,text=item["artist"],sticky="ew")
+            ])
 
+    def set_current_song(self,qid):
+        self._qid=qid
+
+        for i in range(len(self._items)):
+            item = self._items[i]
+            if i==qid-1:
+                for col in self._rows[i]:
+                    col["fg"] = "white"
+                    col["bg"] = "darkblue"
+            else:
+                for col in self._rows[i]:
+                    col["fg"] = "black"
+                    col["bg"] = "white" if i % 2 else "lightgrey"
 
 def wrap_window(master,inner_frame,frame_arguments={},**kwargs):
     window = tk.Toplevel(master=master,**kwargs)

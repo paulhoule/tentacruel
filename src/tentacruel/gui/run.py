@@ -2,7 +2,7 @@ import tkinter as tk
 
 import asyncio
 import json
-from logging import getLogger
+from logging import getLogger, DEBUG, StreamHandler
 from math import floor
 
 from tentacruel import HeosClientProtocol, RECEIVER_IP, HEOS_PORT
@@ -10,6 +10,9 @@ from tentacruel.gui import ManagedGridFrame
 from tentacruel.gui.browser import SourceBrowser, GeneralBrowser, wrap_window, PlaylistBrowser
 
 logger = getLogger(__name__)
+getLogger(None).setLevel(DEBUG)
+getLogger(None).addHandler(StreamHandler())
+
 #
 # constant widget names
 #
@@ -39,6 +42,8 @@ class Application(ManagedGridFrame):
         super().__init__(master)
         self.alive = True
         self.browsers = {}
+        self.queues = {}
+        self._transitioning_to = None
 
         self._add(QUIT_BUTTON, tk.Button, text="Quit", command=self.quit, width=15, height=1,
                   columnspan=1)
@@ -59,11 +64,11 @@ class Application(ManagedGridFrame):
         self._add(ARTIST+"_label", tk.Label,text="Artist:",width=15,anchor='e')
         self._add(ARTIST, tk.Label, text="", width=50, height=1,columnspan=3,anchor='w')
         self._add(PROGRESS, tk.Label, text="", width=50, height=1,columnspan=4)
-        self._add(PREV_BUTTON, tk.Button, text="Prev", width=15, height=1)
+        self._add(PREV_BUTTON, tk.Button, text="Prev", width=15, height=1,command=self.task(self.prev))
         self._add(PLAY_BUTTON, tk.Button, text="Play", width=30, height=1,
                   columnspan=2,
                    command=self.task(self.play_command))
-        self._add(NEXT_BUTTON, tk.Button, text="Next", width=15, height=1)
+        self._add(NEXT_BUTTON, tk.Button, text="Next", width=15, height=1,command=self.task(self.next))
         self._add(VOLUME,
                   tk.Scale, from_=0, to=100.0, length = 200,
                   command = self.task(self.set_volume),
@@ -86,6 +91,7 @@ class Application(ManagedGridFrame):
     def playlist(self):
         my_pid = int(self._current_player_info()["pid"])
         playlist = wrap_window(self,PlaylistBrowser,frame_arguments={"pid": my_pid},width=500, height=100)
+        self.queues[my_pid]=playlist
         asyncio.create_task(playlist.fill_source())
 
     def unregister_browser(self,sid, cid):
@@ -157,9 +163,9 @@ class Application(ManagedGridFrame):
     def handle_state_changed(self, message):
         if self.wrong_pid(message):
             return
+        self._transitioning_to = None
         self[PLAY_BUTTON]["text"] = "Stop" if message["state"] == 'play' else "Play"
-        if message["state"] == 'play':
-            self.update_status("ok")
+        self.update_status("ok")
 
     def handle_volume_changed(self, message):
         if self.wrong_pid(message):
@@ -177,7 +183,7 @@ class Application(ManagedGridFrame):
     def _handle_progress(self, count):
         logger.debug(f"In flight command count is %s",count)
         if count==0:
-            self.update_status("ok")
+            self.update_status("ok" if self._transitioning_to == None else "starting")
         else:
             self.update_status("wait")
 
@@ -214,6 +220,7 @@ class Application(ManagedGridFrame):
     async def play_command(self):
         player = self._player()
         new_state = self[PLAY_BUTTON]["text"].lower()
+        self._transitioning_to = new_state
         await player.set_play_state(new_state)
 
     async def set_volume(self,level):
@@ -222,6 +229,14 @@ class Application(ManagedGridFrame):
 
     async def set_mute(self):
         await self._player().set_mute(state = "on" if self.mute_status.get() else "off")
+
+    async def next(self):
+        self._transitioning_to = "play"
+        await self._player().play_next()
+
+    async def prev(self):
+        self._transitioning_to = "play"
+        await self._player().play_previous()
 
     def _player(self):
         return self.hcp.players[self[DEVICE_SELECTOR].get()]
@@ -241,6 +256,9 @@ class Application(ManagedGridFrame):
         elif is_ok=="wait":
             self[STATUS]["text"]="waiting"
             self[STATUS]["background"]="yellow"
+        elif is_ok=="starting":
+            self[STATUS]["text"]="starting"
+            self[STATUS]["background"]="orange"
         else:
             self[STATUS]["text"]="error"
             self[STATUS]["background"]="red"
@@ -253,13 +271,15 @@ class Application(ManagedGridFrame):
         self[VOLUME].set(volume)
         mute = (await player.get_mute())["state"]
         self.mute_status.set(mute)
-        q = await player.get_queue()
-        print(json.dumps(q,indent=2))
 
     def update_now_playing(self):
         self[SONG]["text"]=self.now_playing["song"]
         self[ARTIST]["text"]=self.now_playing["artist"]
         self[ALBUM]["text"]=self.now_playing["album"]
+        my_pid = int(self._current_player_info()["pid"])
+        if my_pid in self.queues:
+            queue = self.queues[my_pid]
+            queue.set_current_song(self.now_playing["qid"])
 
 async def run_tk(root, interval=0.05):
     '''

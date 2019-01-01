@@ -35,7 +35,7 @@ class ManagedGridFrame(Frame):
         return wrapper
 
     def _add(self,name,widget_type,*args,**kwargs):
-        grid_args = {"column","columnspan","row","rowspan"}
+        grid_args = {"column","columnspan","row","rowspan","sticky"}
         gridkw = keep(kwargs,grid_args)
         if "columnspan" in gridkw and type(gridkw["columnspan"]) == STAR:
             gridkw["columnspan"] = self._columns
@@ -52,6 +52,7 @@ class ManagedGridFrame(Frame):
         widget = widget_type(self,*args,**widgetkw)
         widget.grid(**gridkw)
         self._widgets[name]=(widget)
+        return widget
 
     def __getitem__(self,name):
         return self._widgets[name]
