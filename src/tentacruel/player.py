@@ -197,7 +197,7 @@ class _HeosPlayer(_HeosService):
             pid=self._player_id
 
         if not isinstance(qid,list):
-            qid=list(qid)
+            qid=[qid]
 
         return await self._run(
             "remove_from_queue",

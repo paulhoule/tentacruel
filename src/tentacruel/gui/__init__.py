@@ -34,6 +34,13 @@ class ManagedGridFrame(Frame):
 
         return wrapper
 
+    def _clear_all(self):
+        for widget in self.grid_slaves():
+            widget.destroy()
+        self._col=0
+        self._row=0
+        self._widgets = {}
+
     def _add(self,name,widget_type,*args,**kwargs):
         grid_args = {"column","columnspan","row","rowspan","sticky"}
         gridkw = keep(kwargs,grid_args)

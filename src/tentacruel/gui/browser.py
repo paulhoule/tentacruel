@@ -4,7 +4,7 @@ import tkinter as tk
 from typing import Dict, Set
 from logging import getLogger
 
-from tentacruel.gui import ManagedGridFrame, keep, discard
+from tentacruel.gui import ManagedGridFrame, keep, discard, STAR
 
 logger = getLogger(__name__)
 HEADER = "header"
@@ -144,33 +144,56 @@ class PlaylistBrowser(ManagedGridFrame):
         return self._application.hcp
 
     def __init__(self, pid, application=None, **kwargs):
-        super().__init__(columns=4,**kwargs)
+        super().__init__(columns=6,**kwargs)
         self._application = application
         self._pid = pid
         self._qid = None
         self._items = []
         self._rows = []
-
-        self._add(HEADER, tk.Label, text="Playlist", width=100, height=1,columnspan=4)
+        self._add(HEADER, tk.Label, text="Playlist", width=100, height=1, columnspan=STAR())
 
     async def fill_source(self):
+        # some details:  we should have a centrally managed now_playing rather than fetching it
+        # every time4
         result = await self.heos()[self._pid].get_queue()
+        now_playing = await self.heos()[self._pid].get_now_playing_media()
+        self._rows.clear()
+        self._clear_all()
+
         self._items = result["payload"]
+        self._add(HEADER, tk.Label, text="Playlist", width=100, height=1,columnspan=STAR())
         for i in range(len(self._items)):
             item = self._items[i]
             self._rows.append([
                 self._add(f"qid_{i}",tk.Label,text=item["qid"],sticky="ew"),
+                self._add(f"play_{i}", tk.Button, text="Play", sticky="ew",
+                          command = self.play_item(item["qid"])),
+                self._add(f"remove_{i}", tk.Button, text="Remove", sticky="ew",
+                          command=self.remove_item(item["qid"])),
                 self._add(f"song_{i}",tk.Label,text=item["song"],sticky="ew"),
                 self._add(f"album_{i}",tk.Label,text=item["album"],sticky="ew"),
                 self._add(f"artist_{i}",tk.Label,text=item["artist"],sticky="ew")
             ])
 
+        self.set_current_song(now_playing["payload"].get("qid",None))
+
+    def play_item(self,qid=None):
+        def click_handler():
+            asyncio.create_task(self._application.play_queue(qid,self._pid))
+
+        return click_handler
+
+    def remove_item(self,qid=None):
+        def click_handler():
+            asyncio.create_task(self._application.remove_from_queue(qid,self._pid))
+
+        return click_handler
+
     def set_current_song(self,qid):
         self._qid=qid
 
         for i in range(len(self._items)):
-            item = self._items[i]
-            if i==qid-1:
+            if qid and i==qid-1:
                 for col in self._rows[i]:
                     col["fg"] = "white"
                     col["bg"] = "darkblue"

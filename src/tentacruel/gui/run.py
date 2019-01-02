@@ -10,7 +10,7 @@ from tentacruel.gui import ManagedGridFrame
 from tentacruel.gui.browser import SourceBrowser, GeneralBrowser, wrap_window, PlaylistBrowser
 
 logger = getLogger(__name__)
-getLogger(None).setLevel(DEBUG)
+#getLogger(None).setLevel(DEBUG)
 getLogger(None).addHandler(StreamHandler())
 
 #
@@ -118,6 +118,12 @@ class Application(ManagedGridFrame):
             identifiers["mid"] = mid
         await self._player().add_to_queue(sid,cid,mid)
 
+    async def play_queue(self, qid=None, pid=None):
+        await self._player().play_queue(qid,pid)
+
+    async def remove_from_queue(self,qid=None,pid=None):
+        await self._player().remove_from_queue(qid,pid)
+
     def quit(self):
         self.alive = False
         super().quit()
@@ -152,8 +158,10 @@ class Application(ManagedGridFrame):
             asyncio.create_task(self.handle_now_playing_changed(message))
         elif event == "/player_now_playing_progress":
             self.handle_now_playing_progress(message)
+        elif event == "/player_queue_changed":
+            self.handle_player_queue_changed(message)
         else:
-            logger.debug("received event %s",event)
+            logger.warning("received unhandled event %s",event)
 
     def wrong_pid(self,message):
         that_pid = int(message["pid"])
@@ -179,6 +187,17 @@ class Application(ManagedGridFrame):
             return
         self.update_status("error")
         logger.error(message)
+
+    def handle_player_queue_changed(self, message):
+        pid = int(message["pid"])
+        if pid in self.queues:
+            logger.warning(f"Filling queue for player {pid}")
+            queue = self.queues[pid]
+            asyncio.create_task(queue.fill_source())
+        else:
+            logger.warning(f"Could not fill queue for {pid}")
+            logger.warning(f"Queue keys: {self.queues.keys()}")
+
 
     def _handle_progress(self, count):
         logger.debug(f"In flight command count is %s",count)
