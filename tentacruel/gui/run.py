@@ -7,7 +7,7 @@ from math import floor
 
 from tentacruel import HeosClientProtocol, RECEIVER_IP, HEOS_PORT
 from tentacruel.gui import ManagedGridFrame
-from tentacruel.gui.browser import SourceBrowser, GeneralBrowser, wrap_window, PlaylistBrowser
+from tentacruel.gui.browser import SourceBrowser, GeneralBrowser, wrap_window, PlaylistBrowser, wrap_scrollbar
 
 logger = getLogger(__name__)
 #getLogger(None).setLevel(DEBUG)
@@ -101,7 +101,7 @@ class Application(ManagedGridFrame):
         if not (sid or cid):
             return wrap_window(self,SourceBrowser,width=500, height=100)
         else:
-            return wrap_window(self,GeneralBrowser,
+            return wrap_scrollbar(self,GeneralBrowser,
                                frame_arguments={
                                    "sid": sid,
                                    "cid": cid

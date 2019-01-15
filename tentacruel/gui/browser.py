@@ -209,5 +209,22 @@ def wrap_window(master,inner_frame,frame_arguments={},**kwargs):
     that.grid()
     return that
 
-
+def wrap_scrollbar(master,inner_frame,frame_arguments={},**kwargs):
+    window = tk.Toplevel(master=master,**kwargs)
+    window.columnconfigure(0,weight=1)
+    window.rowconfigure(0,weight=1)
+    canvas = tk.Canvas(master=window)
+    canvas.grid()
+    that = inner_frame(master=canvas,application=master,**frame_arguments)
+    that.grid()
+    def update_region(event):
+        print("Updating scroll region")
+        bounds = that.bbox("all")
+        print(bounds)
+        canvas.configure(scrollregion=bounds)
+    that.bind("<Configure>",update_region)
+    scrollbar = tk.Scrollbar(master=window,command=canvas.yview)
+    canvas.configure(yscrollcommand=scrollbar.set)
+    scrollbar.grid(row=0,column=1,sticky="ns")
+    return that
 

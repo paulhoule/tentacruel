@@ -1,0 +1,8 @@
+[tool.poetry]
+name = "tentacruel"
+version = "0.1.0"
+description = "Software library and GUI for Denon HEOS speakers and amplifiers"
+authors = ["Paul Houle <paul.houle@ontology2.com>"]
+
+[tool.poetry.dev-dependencies]
+pytest = "^3.0"

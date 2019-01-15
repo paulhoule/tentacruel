@@ -1,5 +1,4 @@
 import asyncio
-print(asyncio)
 
 class _HeosService():
     def __init__(self,protocol):
