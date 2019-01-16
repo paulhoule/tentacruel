@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 import tkinter as tk
 from typing import Dict, Set
 from logging import getLogger
@@ -80,8 +81,6 @@ class GeneralBrowser(ManagedGridFrame):
 
     async def fill_source(self):
         query = self.coordinates.copy()
-        if "cid" in query:
-            query["range"]="0,20"
         result = await self.heos().browse.browse(**query)
         items = result["payload"]
         for i in range(len(items)):
@@ -154,7 +153,7 @@ class PlaylistBrowser(ManagedGridFrame):
 
     async def fill_source(self):
         # some details:  we should have a centrally managed now_playing rather than fetching it
-        # every time4
+        # every time
         result = await self.heos()[self._pid].get_queue()
         now_playing = await self.heos()[self._pid].get_now_playing_media()
         self._rows.clear()
@@ -213,18 +212,31 @@ def wrap_scrollbar(master,inner_frame,frame_arguments={},**kwargs):
     window = tk.Toplevel(master=master,**kwargs)
     window.columnconfigure(0,weight=1)
     window.rowconfigure(0,weight=1)
-    canvas = tk.Canvas(master=window)
-    canvas.grid()
+    scrollbar = tk.Scrollbar(master=window)
+    scrollbar.grid(row=0,column=1,sticky="ns")
+    canvas = tk.Canvas(master=window,yscrollcommand=scrollbar.set)
+    scrollbar.config(command=canvas.yview)
+    canvas.grid(row=0,column=0,sticky="ns")
     that = inner_frame(master=canvas,application=master,**frame_arguments)
-    that.grid()
+    canvas.create_window(0,0,window=that,anchor="nw")
     def update_region(event):
         print("Updating scroll region")
         bounds = that.bbox("all")
         print(bounds)
-        canvas.configure(scrollregion=bounds)
+        canvas.configure(scrollregion=bounds,width=bounds[2])
+        print(window.geometry())
     that.bind("<Configure>",update_region)
-    scrollbar = tk.Scrollbar(master=window,command=canvas.yview)
-    canvas.configure(yscrollcommand=scrollbar.set)
-    scrollbar.grid(row=0,column=1,sticky="ns")
+
+    def update_window(event):
+        if event.widget == window:
+            if event.height>600:
+                window.geometry(f"{event.width}x600")
+
+            print(f"The window named {window} saw window height {event.height} ")
+
+    window.bind("<Configure>",update_window)
+
     return that
+
+tk.Event
 
