@@ -81,50 +81,61 @@ class GeneralBrowser(ManagedGridFrame):
 
     async def fill_source(self):
         query = self.coordinates.copy()
-        result = await self.heos().browse.browse(**query)
-        items = result["payload"]
-        for i in range(len(items)):
-            item = items[i]
-            keys = keep(item,{"cid","mid"})
-            keys["sid"] = self.coordinates["sid"]
-            if "cid" not in keys:
-                keys["cid"] = self.coordinates["cid"]
+        while True:
+            result = await self.heos().browse.browse(**query)
+            items = result.get("payload",[])
+            if not items:
+                break
+            for i in range(len(items)):
+                item = items[i]
+                await self.insert_item(i, item)
+            message = result.get("message")
+            returned = int(message["returned"])
+            original_start = 0
+            if "range" in message:
+                original_start = int(message["range"].split(",")[0])
+            start = original_start + returned
+            end = start + returned
+            print(message)
+            query["range"]=f"{start},{end}"
 
-            if item.get("container","no")=="yes":
-                self._add(BROWSE(i),
-                    tk.Button,
-                    text = "Browse",
-                    command=self.browse_to_item(**keys),
-                    row = i+1,
-                    column = 0
-                )
-
-            if item.get("playable","no")=="yes":
-                self._add(PLAY(i),
-                    tk.Button,
-                    command=self.play_item(**keys),
-                    text="Play",
-                    row=i + 1,
-                    column=1
-                )
-
-            if "type" in item:
-                self._add(TYPE(i),
-                    tk.Label,
-                    text = item["type"],
-                    row=i+1,
-                    column=2
-                )
-
-            self._add(LINE(i),
-                tk.Button,
-                text=item["name"],
-                width=100,height=1,
-                bg="white" if i % 2 else "lightgrey",
-                command=self.browse_to_item(**keys),
-                row = i+1,
-                column = 3
-            )
+    async def insert_item(self, i, item):
+        keys = keep(item, {"cid", "mid"})
+        keys["sid"] = self.coordinates["sid"]
+        if "cid" not in keys:
+            keys["cid"] = self.coordinates["cid"]
+        if item.get("container", "no") == "yes":
+            self._add(BROWSE(i),
+                      tk.Button,
+                      text="Browse",
+                      command=self.browse_to_item(**keys),
+                      row=i + 1,
+                      column=0
+                      )
+        if item.get("playable", "no") == "yes":
+            self._add(PLAY(i),
+                      tk.Button,
+                      command=self.play_item(**keys),
+                      text="Play",
+                      row=i + 1,
+                      column=1
+                      )
+        if "type" in item:
+            self._add(TYPE(i),
+                      tk.Label,
+                      text=item["type"],
+                      row=i + 1,
+                      column=2
+                      )
+        self._add(LINE(i),
+                  tk.Button,
+                  text=item["name"],
+                  width=100, height=1,
+                  bg="white" if i % 2 else "lightgrey",
+                  command=self.browse_to_item(**keys),
+                  row=i + 1,
+                  column=3
+                  )
 
     def browse_to_item(self,sid=None,cid=None,mid=None):
         def click_handler():
@@ -220,11 +231,8 @@ def wrap_scrollbar(master,inner_frame,frame_arguments={},**kwargs):
     that = inner_frame(master=canvas,application=master,**frame_arguments)
     canvas.create_window(0,0,window=that,anchor="nw")
     def update_region(event):
-        print("Updating scroll region")
         bounds = that.bbox("all")
-        print(bounds)
         canvas.configure(scrollregion=bounds,width=bounds[2])
-        print(window.geometry())
     that.bind("<Configure>",update_region)
 
     def update_window(event):
