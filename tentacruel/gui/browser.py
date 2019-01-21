@@ -72,6 +72,9 @@ class GeneralBrowser(ManagedGridFrame):
         super().__init__(columns=4,**kwargs)
         self._application = application
         self.coordinates = {}
+        self._item_idx = 0
+        self._item_ids = set()
+
         if sid:
             self.coordinates["sid"]=sid
         if cid:
@@ -88,22 +91,36 @@ class GeneralBrowser(ManagedGridFrame):
                 break
             for i in range(len(items)):
                 item = items[i]
-                await self.insert_item(i, item)
+                await self.insert_item(item)
             message = result.get("message")
+            count = int(message["count"])
             returned = int(message["returned"])
             original_start = 0
             if "range" in message:
                 original_start = int(message["range"].split(",")[0])
             start = original_start + returned
             end = start + returned
-            print(message)
             query["range"]=f"{start},{end}"
 
-    async def insert_item(self, i, item):
+        # this check is aimed at the possibility that we have an off-by-one error of some kind associated with
+        # (say) not knowing exactly how ranges are defined in the HEOS API
+        if count == self._item_idx:
+            if count == len(self._item_ids):
+                logger.debug("Number of results found matches number expected and all items unique")
+            else:
+                logger.warning(f"Number of results {self._item_idx} found matches number expected but only {len(self._item_ids)} are unique")
+        else:
+            logger.warning(f"Number of results found {self._item_idx} does not match number expected {count}")
+
+    async def insert_item(self, item):
         keys = keep(item, {"cid", "mid"})
         keys["sid"] = self.coordinates["sid"]
         if "cid" not in keys:
             keys["cid"] = self.coordinates["cid"]
+
+        self._item_ids.add((keys["sid"],keys["cid"],keys.get("mid",None)))
+
+        i = self._item_idx
         if item.get("container", "no") == "yes":
             self._add(BROWSE(i),
                       tk.Button,
@@ -136,6 +153,8 @@ class GeneralBrowser(ManagedGridFrame):
                   row=i + 1,
                   column=3
                   )
+
+        self._item_idx += 1
 
     def browse_to_item(self,sid=None,cid=None,mid=None):
         def click_handler():
@@ -245,6 +264,4 @@ def wrap_scrollbar(master,inner_frame,frame_arguments={},**kwargs):
     window.bind("<Configure>",update_window)
 
     return that
-
-tk.Event
 
