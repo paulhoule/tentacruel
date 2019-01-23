@@ -87,14 +87,31 @@ class GeneralBrowser(ManagedGridFrame):
         while True:
             result = await self.heos().browse.browse(**query)
             items = result.get("payload",[])
+
+            #
+            # according to the HEOS API documentation we are supposed to know that we won't get more results
+            # when we get back an empty result set
+            #
+
             if not items:
                 break
+
             for i in range(len(items)):
                 item = items[i]
                 await self.insert_item(item)
             message = result.get("message")
             count = int(message["count"])
             returned = int(message["returned"])
+
+            #
+            # In the case of a query against iHeartRadio,  ranges are ignored (!)
+            # so if in the first result,  count==returned we are going to assume that we won't
+            # get any more
+            #
+
+            if count==returned and "range" not in message:
+                break
+
             original_start = 0
             if "range" in message:
                 original_start = int(message["range"].split(",")[0])
@@ -130,9 +147,14 @@ class GeneralBrowser(ManagedGridFrame):
                       column=0
                       )
         if item.get("playable", "no") == "yes":
+            if "type" in item and item["type"] == "station":
+                play_command = self.play_stream(name=item["name"], **keys)
+            else:
+                play_command = self.play_item(**keys)
+
             self._add(PLAY(i),
                       tk.Button,
-                      command=self.play_item(**keys),
+                      command=play_command,
                       text="Play",
                       row=i + 1,
                       column=1
@@ -165,6 +187,12 @@ class GeneralBrowser(ManagedGridFrame):
     def play_item(self,sid=None,cid=None,mid=None):
         def click_handler():
             asyncio.create_task(self._application.play_item(sid,cid,mid))
+
+        return click_handler
+
+    def play_stream(self, sid=None, cid=None, mid=None, name=""):
+        def click_handler():
+            asyncio.create_task(self._application.play_stream(sid, cid, mid, name))
 
         return click_handler
 

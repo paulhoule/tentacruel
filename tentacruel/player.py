@@ -246,3 +246,13 @@ class _HeosPlayer(_HeosService):
             "play_previous",
             arguments=dict(pid=pid)
         )
+
+    async def play_stream(self,sid,cid,mid,name,pid=None):
+        if pid==None:
+            pid=self._player_id
+
+        arguments=dict(sid=sid,cid=cid,mid=mid,pid=pid,name=name)
+        return await self._run(
+            "play_stream",
+            arguments=arguments
+        )

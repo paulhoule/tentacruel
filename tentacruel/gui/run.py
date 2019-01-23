@@ -10,7 +10,7 @@ from tentacruel.gui import ManagedGridFrame
 from tentacruel.gui.browser import SourceBrowser, GeneralBrowser, wrap_window, PlaylistBrowser, wrap_scrollbar
 
 logger = getLogger(__name__)
-#getLogger(None).setLevel(DEBUG)
+getLogger(None).setLevel(DEBUG)
 getLogger(None).addHandler(StreamHandler())
 
 #
@@ -117,6 +117,19 @@ class Application(ManagedGridFrame):
         if mid:
             identifiers["mid"] = mid
         await self._player().add_to_queue(sid,cid,mid)
+
+    async def play_stream(self,sid=None,cid=None,mid=None,name=""):
+        identifiers = {}
+        if sid:
+            identifiers["sid"] = sid
+        if cid:
+            identifiers["cid"] = cid
+        if mid:
+            identifiers["mid"] = mid
+        if name:
+            identifiers["name"] = name
+
+        await self._player().play_stream(sid,cid,mid,name)
 
     async def play_queue(self, qid=None, pid=None):
         await self._player().play_queue(qid,pid)
