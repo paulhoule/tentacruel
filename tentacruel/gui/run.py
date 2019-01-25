@@ -4,8 +4,10 @@ import asyncio
 from logging import getLogger, DEBUG, StreamHandler
 from math import floor
 from os import environ
+from pathlib import Path
 
-from tentacruel import HeosClientProtocol, RECEIVER_IP, HEOS_PORT
+import yaml
+from tentacruel import HeosClientProtocol, HEOS_PORT
 from tentacruel.gui import ManagedGridFrame
 from tentacruel.gui.browser import SourceBrowser, GeneralBrowser, wrap_window, PlaylistBrowser, wrap_scrollbar
 
@@ -14,6 +16,11 @@ if "LOGGING_LEVEL" in environ:
     getLogger(None).setLevel(environ["LOGGING_LEVEL"])
 
 getLogger(None).addHandler(StreamHandler())
+
+with open(Path.home() / ".tentacruel" / "config.yaml") as config:
+    parameters = yaml.load(config)
+
+RECEIVER_IP = parameters["server"]["ip"]
 
 #
 # constant widget names

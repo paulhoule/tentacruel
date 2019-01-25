@@ -13,7 +13,6 @@ from tentacruel.system import _HeosSystem
 from tentacruel.browse import _HeosBrowse
 from tentacruel.player import _HeosPlayer
 
-RECEIVER_IP = "192.168.0.10"
 HEOS_PORT = 1255
 
 LOCAL_MUSIC = 1024

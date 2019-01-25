@@ -6,3 +6,5 @@ authors = ["Paul Houle <paul.houle@ontology2.com>"]
 
 [tool.poetry.dev-dependencies]
 pytest = "^3.0"
+[tool.poetry.dependencies]
+pyyaml = "^3.13"

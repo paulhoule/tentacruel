@@ -1,0 +1,39 @@
+{
+  'heos': {
+    'command': 'player/get_now_playing_media',
+    'result': 'success',
+    'message': 'pid=-527850911&SEQUENCE=20'
+  },
+  'payload': {
+    'type': 'song',
+    'song': "Mr. Monokuma's Lesson",
+    'album': 'DANGANRONPA Original Soundtrack',
+    'artist': 'Masafumi Takada',
+    'image_url': 'http://192.168.0.10:8015//m-browsableMediaUri/getImageFromTag/mnt/sda1/danganronpa_ost/101%20DANGANRONPA.mp3',
+    'album_id': 'm-9787465e-a835-cdbd-73a1-6768ed02cdd8/fol/danganronpa_ost',
+    'mid': "m-9787465e-a835-cdbd-73a1-6768ed02cdd8/fol/danganronpa_ost/203 Mr. Monokuma's Lesson.mp3",
+    'qid': 1,
+    'sid': 1024
+  },
+  'options': []
+}
+
+{
+  'heos': {
+    'command': 'player/get_now_playing_media',
+    'result': 'success',
+    'message': 'pid=1934386992&SEQUENCE=8'
+  },
+  'payload': {
+    'type': 'song',
+    'song': "Mr. Monokuma's Lesson",
+    'album': 'DANGANRONPA Original Soundtrack',
+    'artist': 'Masafumi Takada',
+    'image_url': 'http://192.168.0.10:8015//m-browsableMediaUri/getImageFromTag/mnt/sda1/danganronpa_ost/101%20DANGANRONPA.mp3',
+    'album_id': 'm-9787465e-a835-cdbd-73a1-6768ed02cdd8/fol/danganronpa_ost',
+    'mid': "m-9787465e-a835-cdbd-73a1-6768ed02cdd8/fol/danganronpa_ost/203 Mr. Monokuma's Lesson.mp3",
+    'qid': 1,
+    'sid': 1024
+  },
+  'options': []
+}
