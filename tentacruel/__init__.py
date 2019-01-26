@@ -191,7 +191,7 @@ class HeosClientProtocol(asyncio.Protocol):
         for name,player in self.players.items():
             if that==name:
                 return player
-            if str(player._player_id) == str(that):
+            if str(player._pid) == str(that):
                 return player
         raise KeyError(f"Couldn't find player with key {that}")
 
