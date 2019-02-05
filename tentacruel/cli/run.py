@@ -39,6 +39,11 @@ class Application:
                 raise ValueError("The player command takes exactly one argument,  the number or name of the player")
 
             player_specification = parameters[0]
+            pid = self._parse_player_specification(player_specification)
+
+            self._player = self._heos()[pid]
+
+        def _parse_player_specification(self, player_specification):
             pid = None
             try:
                 pid = int(player_specification)
@@ -48,9 +53,9 @@ class Application:
                         pid = player["pid"]
                         break
             if not pid:
-                raise ValueError("You much specify a numeric player id or player key registered in the configuration file")
-
-            self._player = self._heos()[pid]
+                raise ValueError(
+                    "You much specify a numeric player id or player key registered in the configuration file")
+            return pid
 
         async def play(self,parameters):
             if not len(parameters):
@@ -99,6 +104,29 @@ class Application:
 
             await self._player.set_volume(volume)
 
+        async def get_groups(self,parameters):
+            if len(parameters):
+                raise ValueError("The get_groups command takes no arguments")
+
+            result = await self._heos().group.get_groups()
+            print("Got back from get_groups")
+            print(result)
+
+        async def ungroup(self,parameters):
+            if len(parameters):
+                raise ValueError("The clear_groups command takes no arguments")
+
+            result = await self._heos().group.get_groups()
+            for group in result:
+                leader = [player["pid"] for player in group["players"] if player["role"] == "leader"]
+                await self._heos().group.set_group(leader)
+
+        async def group(self,parameters):
+            if not len(parameters):
+                raise ValueError("You must specify multiple player names to create a group")
+
+            pid_list = [self._parse_player_specification(x) for x in parameters]
+            await self._heos().group.set_group(pid_list)
 
     async def run(self,that:HeosClientProtocol):
         self._heos = that

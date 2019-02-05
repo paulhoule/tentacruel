@@ -12,6 +12,7 @@ from tentacruel.service import _HeosService
 from tentacruel.system import _HeosSystem
 from tentacruel.browse import _HeosBrowse
 from tentacruel.player import _HeosPlayer
+from tentacruel.group import _HeosGroup
 
 HEOS_PORT = 1255
 
@@ -43,6 +44,7 @@ class HeosClientProtocol(asyncio.Protocol):
 
         self.system = _HeosSystem(self)
         self.browse = _HeosBrowse(self)
+        self.group = _HeosGroup(self)
         self.players = {}
 
         self.inflight_commands = dict()
@@ -136,13 +138,12 @@ class HeosClientProtocol(asyncio.Protocol):
                 future.set_exception(HeosError(message["eid"],message["text"]))
                 return
 
-            payload = jdata.get("payload")
-            if message and payload:
-                future.set_result(dict(message=message, payload=payload))
+            if message and "payload" in jdata:
+                future.set_result(dict(message=message, payload=jdata["payload"]))
             elif message:
                 future.set_result(message)
-            elif payload:
-                future.set_result(payload)
+            elif "payload" in jdata:
+                future.set_result(jdata["payload"])
 
             self.update_progress_listeners()
 
