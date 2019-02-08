@@ -8,6 +8,8 @@ authors = ["Paul Houle <paul.houle@ontology2.com>"]
 pytest = "^3.0"
 [tool.poetry.dependencies]
 pyyaml = "^3.13"
+skyfield = "^1.10"
+python-dateutil = "^2.8"
 [build-system]
 requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"

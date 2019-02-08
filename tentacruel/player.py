@@ -13,6 +13,9 @@ class _HeosPlayer(_HeosService):
         self.shuffle_states = {"on", "off"}
         self._pid = player_id
 
+    def pid(self):
+        return self._pid
+
     async def get_players(self) -> Future:
         return await self._run(
             "get_players",
