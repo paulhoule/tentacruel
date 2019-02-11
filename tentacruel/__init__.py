@@ -109,13 +109,25 @@ class HeosClientProtocol(asyncio.Protocol):
 
         if command.startswith("event/"):
             event = command[command.index("/"):]
-            message = {key: value[0] for key, value in parse_qs(jdata["heos"]["message"]).items()}
-            self._handle_event(event, message)
+            if not "message" in jdata["heos"]:
+                logger.error("Got event of type [%s] with no message",event)
+                message={}
+            else:
+                message = {key: value[0] for key, value in parse_qs(jdata["heos"]["message"]).items()}
+            try:
+                self._handle_event(event, message)
+            except Exception:
+                logger.error("Caught exception while in event handler for %s",event,exc_info=True)
         else:
-            if jdata["heos"]["message"].startswith("command under process"):
-                return
+            try:
+                if jdata["heos"]["message"].startswith("command under process"):
+                    return
 
-            message = {key: value[0] for key, value in parse_qs(jdata["heos"]["message"]).items()}
+                message = {key: value[0] for key, value in parse_qs(jdata["heos"]["message"]).items()}
+            except KeyError:
+                logger.error("Received HEOS data packet without message")
+                message = {}
+
             futures = self.inflight_commands[command]
             if "SEQUENCE" in message:
                 sequence = int(message["SEQUENCE"])
