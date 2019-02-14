@@ -10,6 +10,7 @@ pytest = "^3.0"
 pyyaml = "^3.13"
 skyfield = "^1.10"
 python-dateutil = "^2.8"
+phue = "^1.1"
 [build-system]
 requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"

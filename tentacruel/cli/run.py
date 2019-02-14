@@ -7,6 +7,7 @@ from os import environ
 from pathlib import Path
 
 import yaml
+from phue import Bridge
 from tentacruel import HeosClientProtocol, HEOS_PORT
 
 logger = getLogger(__name__)
@@ -41,19 +42,71 @@ def sun_time(which_one="sunrise"):
     idx = 0 if which_one=="sunrise" else 1
     return t[idx].astimezone(local)
 
+
+
 class Application:
     def __init__(self,argv):
         self.argv = argv
         self.commands = Application.Commands(self)
 
+    class LightCommands:
+        #
+        # only numeric for now
+        #
+        attributes = {
+            "transitiontime",
+            "brightness",
+            "colortemp",
+            "colortemp_k",
+            "hue",
+            "saturation"
+        }
+        def __init__(self, parent):
+            self.parent = parent
+            self._bridge = Bridge()
+
+        def do(self, parameters):
+            idx = 0
+            first = parameters[idx]
+            idx += 1
+            pattern = re.compile("[0-9]+")
+            if pattern.match(first):
+                light_id = int(first)
+                light = self._bridge.lights[light_id - 1]
+            elif first == "group":
+                second = parameters[idx]
+                idx +=1
+                group_id = int(second)
+                light = self._bridge.groups[group_id - 1]
+            else:
+                raise ValueError("the light command must be followed by a number or by 'group' and then a number")
+
+            while idx<len(parameters):
+                cmd = parameters[idx]
+                idx += 1
+                if cmd == "on":
+                    light.on = True
+                elif cmd == "off":
+                    light.on = False
+                elif cmd in Application.LightCommands.attributes:
+                    amount = int(parameters[idx])
+                    idx += 1
+                    setattr(light,cmd,amount)
+                else:
+                    raise ValueError(f"Command {cmd} is not available for lights")
+
     class Commands:
         def __init__(self,parent):
             self.parent = parent
             self._player = None
+            self._lights = Application.LightCommands(parent)
             self._prefixes = {"list"}
 
         def _heos(self):
             return self.parent._heos
+
+        async def light(self, parameters):
+            self._lights.do(parameters)
 
         async def player(self, parameters):
             if len(parameters) != 1:

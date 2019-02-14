@@ -125,7 +125,7 @@ class HeosClientProtocol(asyncio.Protocol):
 
                 message = {key: value[0] for key, value in parse_qs(jdata["heos"]["message"]).items()}
             except KeyError:
-                logger.error("Received HEOS data packet without message")
+                logger.error("Received HEOS reply for command %s without message",command)
                 message = {}
 
             futures = self.inflight_commands[command]
