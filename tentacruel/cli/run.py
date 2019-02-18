@@ -95,6 +95,14 @@ class Application:
                 else:
                     raise ValueError(f"Command {cmd} is not available for lights")
 
+        def _get_unreachable_lights(self,group_name):
+            that = self._bridge.get_group(group_name)
+            not_available = set()
+            for light in map(int, that['lights']):
+                if not self._bridge.get_light(light)['state']['reachable']:
+                    not_available.add(light)
+            return not_available
+
     class Commands:
         def __init__(self,parent):
             self.parent = parent
@@ -289,6 +297,23 @@ class Application:
             else:
                 raise ValueError("permissible units are seconds,  minutes,  and hours")
             return duration
+
+        async def defend(self,parameters):
+            lights = self._lights._get_unreachable_lights("Bedroom")
+            if lights:
+                await self.player(["Bedroom"]) # Not the same bedroom!
+                await self.volume(["50"])
+                await self.play([("IvyTurnOnBedroom")])
+
+                for _ in range(0,200):
+                    await asyncio.sleep(1)
+                    lights = self._lights._get_unreachable_lights("Bedroom")
+                    if not lights:
+                        await self.play(["IvyThankYou"])
+                        group_id = self._lights._bridge.get_group_id_by_name("Bedroom")
+                        self._lights._bridge.set_group(group_id,"on",False)
+                        return
+
 
     async def run(self,that:HeosClientProtocol):
         self._heos = that
