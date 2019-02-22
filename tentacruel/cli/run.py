@@ -301,8 +301,7 @@ class Application:
         async def defend(self,parameters):
             lights = self._lights._get_unreachable_lights("Bedroom")
             if lights:
-                await self.player(["Bedroom"]) # Not the same bedroom!
-                await self.volume(["50"])
+                await self.player(["Bedroom"]) # Not the same bedroom\
                 await self.play([("IvyTurnOnBedroom")])
 
                 for _ in range(0,200):
