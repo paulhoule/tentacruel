@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import json
 import re
 import sys
 from logging import getLogger, StreamHandler
@@ -16,18 +17,18 @@ if "LOGGING_LEVEL" in environ:
 
 getLogger(None).addHandler(StreamHandler())
 
-with open(Path.home() / ".tentacruel" / "config.yaml") as config:
-    parameters = yaml.load(config)
+with open(Path.home() / ".tentacruel" / "config.yaml") as that:
+    config = yaml.load(that)
 
-RECEIVER_IP = parameters["server"]["ip"]
-players = parameters["players"]
-tracks = parameters["tracks"]
+RECEIVER_IP = config["server"]["ip"]
+players = config["players"]
+tracks = config["tracks"]
 
 def sun_time(which_one="sunrise"):
     from skyfield import api,almanac
     import dateutil.tz
     load = api.Loader("~/.skyfield",verbose=False)
-    location = parameters["location"]
+    location = config["location"]
     ts = load.timescale()
     e = load('de421.bsp')
     here = api.Topos(location["latitude"],location["longitude"])
@@ -312,6 +313,65 @@ class Application:
                         group_id = self._lights._bridge.get_group_id_by_name("Bedroom")
                         self._lights._bridge.set_group(group_id,"on",False)
                         return
+
+        async def process_sensor_events(self,parameters):
+            from arango import ArangoClient
+            client=ArangoClient(**config["arangodb"]["events"]["client"])
+            adb = client.db(**config["arangodb"]["events"]["database"])
+            collection = adb.collection("sqs_events")
+            import boto3
+            sqs = boto3.client(
+                    "sqs",
+                    aws_access_key_id=config["aws"]["aws_access_key_id"],
+                    aws_secret_access_key=config["aws"]["aws_secret_access_key"],
+                    region_name=config["aws"]["region_name"])
+            error_count = 0
+            while(True):
+                try:
+                    events = await self._poll_sqs(collection, sqs)
+                    error_count = 0
+                except Exception as ex:
+                    logger.error(ex)
+                    error_count += 1
+                    if error_count>1:
+                        logger.error("%d consecutive errors polling from SQS queue",error_count)
+
+                    await asyncio.sleep(10)
+                    continue
+
+        async def _poll_sqs(self, collection, sqs):
+            response = sqs.receive_message(
+                QueueUrl=config["aws"]["queue_url"],
+                MaxNumberOfMessages=10,
+                WaitTimeSeconds=20
+            )
+            event_batch = []
+            delete_batch = []
+            if "Messages" not in response:
+                if response["ResponseMetadata"]["HTTPStatusCode"] != 200:
+                    logger.error("Got error while receiving queue messages; response: %s", response)
+                    return []
+            else:
+                for message in response["Messages"]:
+                    delete_batch.append({
+                        "Id": message["MessageId"],
+                        "ReceiptHandle": message["ReceiptHandle"]
+                    })
+                    body = json.loads(message["Body"])
+                    for event in body:
+                        device_event = dict(event["deviceEvent"])
+                        device_event["_key"] = device_event["eventId"]
+                        device_event["eventTime"] = event["eventTime"]
+                        del (device_event["eventId"])
+                        event_batch.append(device_event)
+
+                collection.insert_many(event_batch)
+                sqs.delete_message_batch(
+                    QueueUrl=config["aws"]["queue_url"],
+                    Entries=delete_batch
+                )
+
+
 
 
     async def run(self,that:HeosClientProtocol):

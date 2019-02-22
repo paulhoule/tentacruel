@@ -110,7 +110,7 @@ class HeosClientProtocol(asyncio.Protocol):
         if command.startswith("event/"):
             event = command[command.index("/"):]
             if not "message" in jdata["heos"]:
-                logger.error("Got event of type [%s] with no message",event)
+                logger.debug("Got event of type [%s] with no message",event)
                 message={}
             else:
                 message = {key: value[0] for key, value in parse_qs(jdata["heos"]["message"]).items()}
