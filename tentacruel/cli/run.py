@@ -367,12 +367,15 @@ class Application:
                 region_name=config["aws"]["region_name"])
             poll_error_count = 0
             react_error_count = 0
+
+            events = []
             while True:
                 # pylint: disable=broad-except
                 try:
                     events = await self._poll_sqs(collection, sqs)
                     poll_error_count = 0
                 except Exception as ex:
+                    events = []
                     logger.error(ex)
                     poll_error_count += 1
                     if poll_error_count > 1:
@@ -381,6 +384,7 @@ class Application:
 
                     await asyncio.sleep(10)
                     continue
+
                 for event in events:
                     try:
                         await self._react_to_event(event)
