@@ -1,3 +1,6 @@
+# pylint: disable=missing-docstring
+# pylint: disable=invalid-name
+
 import asyncio
 import datetime
 import json
@@ -17,38 +20,55 @@ if "LOGGING_LEVEL" in environ:
 
 getLogger(None).addHandler(StreamHandler())
 
-with open(Path.home() / ".tentacruel" / "config.yaml") as that:
-    config = yaml.load(that)
+with open(Path.home() / ".tentacruel" / "config.yaml") as a_stream:
+    config = yaml.load(a_stream)
 
 RECEIVER_IP = config["server"]["ip"]
 players = config["players"]
 tracks = config["tracks"]
 
+
+def separate_commands(arguments):
+    commands = []
+    current_command = []
+    divider_pattern = re.compile(r"\\+")
+    for argument in arguments:
+        if divider_pattern.fullmatch(argument):
+            commands.append(current_command)
+            current_command = []
+        else:
+            current_command.append(argument)
+    if current_command:
+        commands.append(current_command)
+    return commands
+
+# pylint: disable=too-many-locals
 def sun_time(which_one="sunrise"):
-    from skyfield import api,almanac
+    from skyfield import api, almanac
     import dateutil.tz
-    load = api.Loader("~/.skyfield",verbose=False)
+    load = api.Loader("~/.skyfield", verbose=False)
     location = config["location"]
     ts = load.timescale()
     e = load('de421.bsp')
-    here = api.Topos(location["latitude"],location["longitude"])
+    here = api.Topos(location["latitude"], location["longitude"])
     now = datetime.datetime.now()
     today = now.date()
     local = dateutil.tz.gettz()
-    midnight=datetime.datetime.combine(today,datetime.time(),local)
+    midnight = datetime.datetime.combine(today, datetime.time(), local)
     next_midnight = midnight + datetime.timedelta(1)
     begin = ts.utc(midnight)
     end = ts.utc(next_midnight)
-    t, y = almanac.find_discrete(begin, end, almanac.sunrise_sunset(e, here))
-    idx = 0 if which_one=="sunrise" else 1
+    t, _ = almanac.find_discrete(begin, end, almanac.sunrise_sunset(e, here))
+    idx = 0 if which_one == "sunrise" else 1
     return t[idx].astimezone(local)
 
 
-
+# pylint: disable=too-few-public-methods
 class Application:
-    def __init__(self,argv):
+    def __init__(self, argv):
         self.argv = argv
         self.commands = Application.Commands(self)
+        self._heos = None
 
     class LightCommands:
         #
@@ -76,13 +96,14 @@ class Application:
                 light = self._bridge.lights[light_id - 1]
             elif first == "group":
                 second = parameters[idx]
-                idx +=1
+                idx += 1
                 group_id = int(second)
                 light = self._bridge.groups[group_id - 1]
             else:
-                raise ValueError("the light command must be followed by a number or by 'group' and then a number")
+                raise ValueError("the light command must be followed by "
+                                 "a number or by 'group' and then a number")
 
-            while idx<len(parameters):
+            while idx < len(parameters):
                 cmd = parameters[idx]
                 idx += 1
                 if cmd == "on":
@@ -92,11 +113,11 @@ class Application:
                 elif cmd in Application.LightCommands.attributes:
                     amount = int(parameters[idx])
                     idx += 1
-                    setattr(light,cmd,amount)
+                    setattr(light, cmd, amount)
                 else:
                     raise ValueError(f"Command {cmd} is not available for lights")
 
-        def _get_unreachable_lights(self,group_name):
+        def _get_unreachable_lights(self, group_name):
             that = self._bridge.get_group(group_name)
             not_available = set()
             for light in map(int, that['lights']):
@@ -105,12 +126,13 @@ class Application:
             return not_available
 
     class Commands:
-        def __init__(self,parent):
+        def __init__(self, parent):
             self.parent = parent
             self._player = None
             self._lights = Application.LightCommands(parent)
             self._prefixes = {"list"}
 
+        # pylint: disable=protected-access
         def _heos(self):
             return self.parent._heos
 
@@ -119,13 +141,15 @@ class Application:
 
         async def player(self, parameters):
             if len(parameters) != 1:
-                raise ValueError("The player command takes exactly one argument,  the number or name of the player")
+                raise ValueError("The player command takes exactly one argument,"
+                                 "  the number or name of the player")
 
             player_specification = parameters[0]
             pid = self._parse_player_specification(player_specification)
 
             self._player = self._heos()[pid]
 
+        # pylint: disable=no-self-use
         def _parse_player_specification(self, player_specification):
             pid = None
             try:
@@ -137,11 +161,12 @@ class Application:
                         break
             if not pid:
                 raise ValueError(
-                    "You much specify a numeric player id or player key registered in the configuration file")
+                    "You much specify a numeric player id or player key"
+                    " registered in the configuration file")
             return pid
 
-        async def play(self,parameters):
-            if not len(parameters):
+        async def play(self, parameters):
+            if not parameters:
                 await self._player.set_play_state("play")
             else:
                 aid = 4
@@ -150,45 +175,45 @@ class Application:
                         if entry["key"] == track:
                             song = dict(entry)
                             del song["key"]
-                            await self._player.add_to_queue(aid=aid,**song)
-                            aid=3
+                            await self._player.add_to_queue(aid=aid, **song)
+                            aid = 3
 
-        async def stop(self,parameters):
-            if len(parameters):
+        async def stop(self, parameters):
+            if parameters:
                 raise ValueError("The stop command takes no arguments")
 
             await self._player.set_play_state("stop")
 
-        async def pause(self,parameters):
-            if len(parameters):
+        async def pause(self, parameters):
+            if parameters:
                 raise ValueError("The pause command takes no arguments")
 
             await self._player.set_play_state("pause")
 
-        async def mute(self,parameters):
-            if len(parameters):
+        async def mute(self, parameters):
+            if parameters:
                 raise ValueError("The mute command takes no arguments")
 
             await self._player.set_mute("on")
 
-        async def unmute(self,parameters):
-            if len(parameters):
+        async def unmute(self, parameters):
+            if parameters:
                 raise ValueError("The mute command takes no arguments")
 
             await self._player.set_mute("off")
 
-        async def volume(self,parameters):
+        async def volume(self, parameters):
             if len(parameters) != 1:
                 raise ValueError("The volume command takes exactly one parameter")
 
             volume = float(parameters[0])
-            if volume<0.0 or volume>100.0:
+            if volume < 0.0 or volume > 100.0:
                 raise ValueError("The volume parameter must be between 0.0 and 100.0")
 
             await self._player.set_volume(volume)
 
-        async def list_groups(self,parameters):
-            if len(parameters):
+        async def list_groups(self, parameters):
+            if parameters:
                 raise ValueError("The list groups command takes no arguments")
 
             result = await self._heos().group.get_groups()
@@ -204,17 +229,21 @@ class Application:
                     print(f"      {player['role']} {player['name']} ({player['pid']})")
                 idx += 1
 
-        async def ungroup(self,parameters):
-            if len(parameters):
+        async def ungroup(self, parameters):
+            if parameters:
                 raise ValueError("The clear_groups command takes no arguments")
 
             result = await self._heos().group.get_groups()
             for group in result:
-                leader = [player["pid"] for player in group["players"] if player["role"] == "leader"]
+                leader = [
+                    player["pid"]
+                    for player in group["players"]
+                    if player["role"] == "leader"
+                ]
                 await self._heos().group.set_group(leader)
 
-        async def group(self,parameters):
-            if not len(parameters):
+        async def group(self, parameters):
+            if not parameters:
                 raise ValueError("You must specify multiple player names to create a group")
 
             if parameters == ['all']:
@@ -223,44 +252,46 @@ class Application:
                 pid_list = [self._parse_player_specification(x) for x in parameters]
             await self._heos().group.set_group(pid_list)
 
-        async def wait(self,parameters):
-            if not len(parameters):
+        # pylint: disable=too-many-branches
+        async def wait(self, parameters):
+            if not parameters:
                 raise ValueError("You must specify a time to wait")
 
-            """
-            The syntax is getting complex enough here that there should be tests (also a plan
-            to parse).  I am trying to fake english here::
-            
-                wait until 4:00 pm
-                
-            """
-            if parameters[0]=="until":
-                if parameters[-1] in {"sunrise","sunset"}:
+            # The syntax is getting complex enough here that there should be tests (also a plan
+            # to parse).  I am trying to fake english here::
+            #
+            #     wait until 4:00 pm
+            #
+            #
+
+            if parameters[0] == "until":
+                if parameters[-1] in {"sunrise", "sunset"}:
                     event = sun_time(parameters[-1])
-                    if len(parameters)==5:
+                    if len(parameters) == 5:
                         amount = int(parameters[1])
                         unit = parameters[2]
                         direction = parameters[3]
-                        if direction not in {"before","after"}:
-                            raise ValueError("A time must be specified before or after sunset or sunrise")
-                        amount = self._convert_to_seconds(amount,unit)
+                        if direction not in {"before", "after"}:
+                            raise ValueError("A time must be specified before or"
+                                             " after sunset or sunrise")
+                        amount = self._convert_to_seconds(amount, unit)
                         if direction == "before":
                             amount = -amount
-                        event +=  datetime.timedelta(seconds=amount)
-                    elif len(parameters)==2:
+                        event += datetime.timedelta(seconds=amount)
+                    elif len(parameters) == 2:
                         pass
                     else:
                         raise ValueError("syntax: wait until 5 minutes before sunrise")
                     import dateutil.tz
                     delay = (event - datetime.datetime.now(tz=dateutil.tz.gettz())).total_seconds()
-                    logger.debug("Waiting for %d seconds",delay)
+                    logger.debug("Waiting for %d seconds", delay)
                     return await asyncio.sleep(delay)
 
-                if len(parameters)==1:
+                if len(parameters) == 1:
                     raise ValueError("You must specify a time to wait until")
 
                 when = parameters[1]
-                match = re.match("(\d{1,2}):(\d{2})(:\d{2})?",when)
+                match = re.match(r"(\d{1,2}):(\d{2})(:\d{2})?", when)
                 if match:
                     hours = int(match.group(1))
                     minutes = int(match.group(2))
@@ -268,20 +299,20 @@ class Application:
                     now = datetime.datetime.now()
                     current_date = now.date()
                     current_time = now.time()
-                    that_time = datetime.time(hours,minutes,seconds)
-                    if that_time<current_time:
+                    that_time = datetime.time(hours, minutes, seconds)
+                    if that_time < current_time:
                         current_date += datetime.timedelta(1)
-                    target_time = datetime.datetime.combine(current_date,that_time)
+                    target_time = datetime.datetime.combine(current_date, that_time)
                     delay = (target_time - now).total_seconds()
-                    logger.debug("Waiting for %d seconds",delay)
+                    logger.debug("Waiting for %d seconds", delay)
                     return await asyncio.sleep(delay)
 
-            if re.match("\d+",parameters[0]):
+            if re.match(r"\d+", parameters[0]):
                 duration = int(parameters[0])
-                if len(parameters)>2:
+                if len(parameters) > 2:
                     raise ValueError("You can at most specify a numeric duration and a unit")
 
-                if len(parameters)==2:
+                if len(parameters) == 2:
                     duration = self._convert_to_seconds(duration, parameters[1])
 
                 return await asyncio.sleep(duration)
@@ -299,45 +330,72 @@ class Application:
                 raise ValueError("permissible units are seconds,  minutes,  and hours")
             return duration
 
-        async def defend(self,parameters):
+        async def defend(self, parameters):
+            if parameters:
+                raise ValueError("defend command takes no parameters")
+
             lights = self._lights._get_unreachable_lights("Bedroom")
             if lights:
                 await self.player(["Bedroom"]) # Not the same bedroom\
                 await self.play([("IvyTurnOnBedroom")])
 
-                for _ in range(0,200):
+                for _ in range(0, 200):
                     await asyncio.sleep(1)
                     lights = self._lights._get_unreachable_lights("Bedroom")
                     if not lights:
                         await self.play(["IvyThankYou"])
                         group_id = self._lights._bridge.get_group_id_by_name("Bedroom")
-                        self._lights._bridge.set_group(group_id,"on",False)
+                        self._lights._bridge.set_group(group_id, "on", False)
                         return
 
-        async def process_sensor_events(self,parameters):
+        def _connect_to_adb(self):
             from arango import ArangoClient
-            client=ArangoClient(**config["arangodb"]["events"]["client"])
-            adb = client.db(**config["arangodb"]["events"]["database"])
+            client = ArangoClient(**config["arangodb"]["events"]["client"])
+            return client.db(**config["arangodb"]["events"]["database"])
+
+        async def process_sensor_events(self, parameters):
+            if parameters:
+                raise ValueError("process_sensor_events takes no parameters")
+
+            adb = self._connect_to_adb()
             collection = adb.collection("sqs_events")
             import boto3
             sqs = boto3.client(
-                    "sqs",
-                    aws_access_key_id=config["aws"]["aws_access_key_id"],
-                    aws_secret_access_key=config["aws"]["aws_secret_access_key"],
-                    region_name=config["aws"]["region_name"])
-            error_count = 0
-            while(True):
+                "sqs",
+                aws_access_key_id=config["aws"]["aws_access_key_id"],
+                aws_secret_access_key=config["aws"]["aws_secret_access_key"],
+                region_name=config["aws"]["region_name"])
+            poll_error_count = 0
+            react_error_count = 0
+            while True:
+                # pylint: disable=broad-except
                 try:
                     events = await self._poll_sqs(collection, sqs)
-                    error_count = 0
+                    poll_error_count = 0
                 except Exception as ex:
                     logger.error(ex)
-                    error_count += 1
-                    if error_count>1:
-                        logger.error("%d consecutive errors polling from SQS queue",error_count)
+                    poll_error_count += 1
+                    if poll_error_count > 1:
+                        logger.error("%d consecutive errors polling from SQS queue"
+                                     , poll_error_count)
 
                     await asyncio.sleep(10)
                     continue
+                for event in events:
+                    try:
+                        await self._react_to_event(event)
+                        react_error_count = 0
+                    except Exception as ex:
+                        logger(ex)
+                        react_error_count += 1
+                        if react_error_count > 1:
+                            logger.error(
+                                "%d consecutive errors reacting to events",
+                                react_error_count
+                            )
+
+        async def _react_to_event(self, events):
+            pass
 
         async def _poll_sqs(self, collection, sqs):
             response = sqs.receive_message(
@@ -362,7 +420,7 @@ class Application:
                         device_event = dict(event["deviceEvent"])
                         device_event["_key"] = device_event["eventId"]
                         device_event["eventTime"] = event["eventTime"]
-                        del (device_event["eventId"])
+                        del device_event["eventId"]
                         event_batch.append(device_event)
 
                 collection.insert_many(event_batch)
@@ -371,37 +429,48 @@ class Application:
                     Entries=delete_batch
                 )
 
+        async def read_smartthings_configuration(self, parameters):
+            if parameters:
+                raise ValueError("read_smartthings_configuration takes no parameters")
+            adb = self._connect_to_adb()
+            collection = adb.collection("devices")
+            import requests
+            access_token = config["smartthings"]["personal_access_token"]
+            headers = {
+                "Authorization": f"Bearer {access_token}"
+            }
 
+            url = f"https://api.smartthings.com/devices"
+            while url:
+                response = requests.get(url, headers=headers)
+                device_batch = []
+                device_info = json.loads(response.content)
+                for item in device_info["items"]:
+                    device = dict(item)
+                    device["_key"] = device["deviceId"]
+                    del device["deviceId"]
+                    device_batch.append(device)
+                collection.insert_many(device_batch, overwrite=True)
+                if "next" in device_info["_links"]:
+                    url = device_info["_links"]["next"]["href"]
+                else:
+                    url = None
 
-
-    async def run(self,that:HeosClientProtocol):
+    async def run(self, that: HeosClientProtocol):
         self._heos = that
-        if len(self.argv)==1:
+        if len(self.argv) == 1:
             self.help()
 
-        commands = self.separate_commands(self.argv[1:])
+        commands = separate_commands(self.argv[1:])
         for command in commands:
             command_name = command[0]
             idx = 1
+            # pylint: disable=protected-access
             if command_name in self.commands._prefixes:
                 command_name = f"{command_name}_{command[1]}"
                 idx += 1
-            command_action = getattr(self.commands,command_name)
+            command_action = getattr(self.commands, command_name)
             await command_action(command[idx:])
-
-    def separate_commands(self,arguments):
-        commands = []
-        current_command = []
-        divider_pattern = re.compile(r"\\+")
-        for argument in arguments:
-            if divider_pattern.fullmatch(argument):
-                commands.append(current_command)
-                current_command = []
-            else:
-                current_command.append(argument)
-        if current_command:
-            commands.append(current_command)
-        return commands
 
     def help(self):
         """
@@ -413,10 +482,10 @@ class Application:
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
-    application=Application(sys.argv)
+    application = Application(sys.argv)
 
     coro = loop.create_connection(
-        lambda: HeosClientProtocol(loop,start_action=application.run),
+        lambda: HeosClientProtocol(loop, start_action=application.run),
         RECEIVER_IP, HEOS_PORT
     )
 
