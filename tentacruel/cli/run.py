@@ -428,6 +428,7 @@ class Application:
                     QueueUrl=config["aws"]["queue_url"],
                     Entries=delete_batch
                 )
+                return event_batch
 
         async def read_smartthings_configuration(self, parameters):
             if parameters:
