@@ -368,14 +368,12 @@ class Application:
             poll_error_count = 0
             react_error_count = 0
 
-            events = []
             while True:
                 # pylint: disable=broad-except
                 try:
                     events = await self._poll_sqs(collection, sqs)
                     poll_error_count = 0
                 except Exception as ex:
-                    events = []
                     logger.error(ex)
                     poll_error_count += 1
                     if poll_error_count > 1:
@@ -405,14 +403,15 @@ class Application:
             response = sqs.receive_message(
                 QueueUrl=config["aws"]["queue_url"],
                 MaxNumberOfMessages=10,
-                WaitTimeSeconds=20
+                WaitTimeSeconds=int(environ.get("WAIT_TIME_SECONDS",20))
             )
             event_batch = []
             delete_batch = []
             if "Messages" not in response:
                 if response["ResponseMetadata"]["HTTPStatusCode"] != 200:
                     logger.error("Got error while receiving queue messages; response: %s", response)
-                    return []
+                    raise RuntimeError("Error receiving queue messages")
+                return []
             else:
                 for message in response["Messages"]:
                     delete_batch.append({
