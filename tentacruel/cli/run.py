@@ -396,14 +396,22 @@ class Application:
                                 react_error_count
                             )
 
-        async def _react_to_event(self, events):
-            pass
+        async def _react_to_event(self, event):
+            sensor_id = "a76876ab-6ded-4fb5-9955-76dd0cbb6525"
+            hue_target = ["group", "3"]
+
+            if event["deviceId"] == sensor_id:
+                if event["attribute"] == "motion":
+                    if event["value"] == "active":
+                        await self.light(hue_target + ["on"])
+                    else:
+                        await self.light(hue_target + ["off"])
 
         async def _poll_sqs(self, collection, sqs):
             response = sqs.receive_message(
                 QueueUrl=config["aws"]["queue_url"],
                 MaxNumberOfMessages=10,
-                WaitTimeSeconds=int(environ.get("WAIT_TIME_SECONDS",20))
+                WaitTimeSeconds=int(environ.get("WAIT_TIME_SECONDS", 20))
             )
             event_batch = []
             delete_batch = []
@@ -411,7 +419,6 @@ class Application:
                 if response["ResponseMetadata"]["HTTPStatusCode"] != 200:
                     logger.error("Got error while receiving queue messages; response: %s", response)
                     raise RuntimeError("Error receiving queue messages")
-                return []
             else:
                 for message in response["Messages"]:
                     delete_batch.append({
@@ -431,7 +438,7 @@ class Application:
                     QueueUrl=config["aws"]["queue_url"],
                     Entries=delete_batch
                 )
-                return event_batch
+            return event_batch
 
         async def read_smartthings_configuration(self, parameters):
             if parameters:
