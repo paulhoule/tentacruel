@@ -6,6 +6,7 @@ import datetime
 import json
 import re
 import sys
+import time
 from logging import getLogger, StreamHandler
 from os import environ
 from pathlib import Path
@@ -127,10 +128,12 @@ class Application:
 
     class Commands:
         def __init__(self, parent):
+            self._hue_target = ["group", "3"]
             self.parent = parent
             self._player = None
             self._lights = Application.LightCommands(parent)
             self._sensor_states = {}
+            self._off_at = None
             self._prefixes = {"list"}
 
         # pylint: disable=protected-access
@@ -397,21 +400,25 @@ class Application:
                                 react_error_count
                             )
 
+                if self._off_at and time.time() >= self._off_at:
+                    await self.light(self._hue_target + ["off"])
+                    self._off_at = None
+
         async def _react_to_event(self, event):
             sensors = {
                 "a76876ab-6ded-4fb5-9955-76dd0cbb6525",
                 "c9d2e33e-258b-48c5-af1a-29a95f189d80"
             }
-            hue_target = ["group", "3"]
 
             if event["deviceId"] in sensors:
                 if event["attribute"] == "motion":
                     self._sensor_states[event["deviceId"]] = event["value"]
 
                 if any(x == "active" for x in self._sensor_states.values()):
-                    await self.light(hue_target + ["on"])
+                    await self.light(self._hue_target + ["on"])
+                    self._off_at = None
                 else:
-                    await self.light(hue_target + ["off"])
+                    self._off_at = time.time() + 150  # seconds
 
         async def _poll_sqs(self, collection, sqs):
             response = sqs.receive_message(
