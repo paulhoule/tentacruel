@@ -407,7 +407,8 @@ class Application:
         async def _react_to_event(self, event):
             sensors = {
                 "a76876ab-6ded-4fb5-9955-76dd0cbb6525",
-                "c9d2e33e-258b-48c5-af1a-29a95f189d80"
+                "c9d2e33e-258b-48c5-af1a-29a95f189d80",
+                "a20bab2e-a7d0-4c93-8723-27a7bf3299b6"       # bottom of stairs
             }
 
             if event["deviceId"] in sensors:
