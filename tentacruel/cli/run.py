@@ -338,19 +338,29 @@ class Application:
             if parameters:
                 raise ValueError("defend command takes no parameters")
 
-            lights = self._lights._get_unreachable_lights("Bedroom")
-            if lights:
-                await self.player(["Bedroom"]) # Not the same bedroom\
-                await self.play([("IvyTurnOnBedroom")])
+            if not await self.enforce_lights(
+                    "Bedroom", "Bedroom", "IvyTurnOnBedroom", "IvyThankYou"
+            ):
+                return
 
-                for _ in range(0, 200):
-                    await asyncio.sleep(1)
-                    lights = self._lights._get_unreachable_lights("Bedroom")
-                    if not lights:
-                        await self.play(["IvyThankYou"])
-                        group_id = self._lights._bridge.get_group_id_by_name("Bedroom")
-                        self._lights._bridge.set_group(group_id, "on", False)
-                        return
+            await self.enforce_lights("Hallway", "Room23", "UpstairsHallway", "JoeyThankYou")
+
+        async def enforce_lights(self, group, player, request_voice, thankyou_voice):
+            lights = self._lights._get_unreachable_lights(group)
+            if not lights:
+                return True
+
+            await self.player([player]) # Not the same bedroom\
+            await self.play([request_voice])
+
+            for _ in range(0, 200):
+                await asyncio.sleep(1)
+                lights = self._lights._get_unreachable_lights(group)
+                if not lights:
+                    await self.play([thankyou_voice])
+                    group_id = self._lights._bridge.get_group_id_by_name(group)
+                    self._lights._bridge.set_group(group_id, "on", False)
+                    return False
 
         def _connect_to_adb(self):
             from arango import ArangoClient
