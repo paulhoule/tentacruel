@@ -418,6 +418,7 @@ class Application:
             sensors = {
                 "a76876ab-6ded-4fb5-9955-76dd0cbb6525",
                 "c9d2e33e-258b-48c5-af1a-29a95f189d80",
+                "bf423230-3495-4375-8033-60b4f7d3455c",
                 "a20bab2e-a7d0-4c93-8723-27a7bf3299b6"       # bottom of stairs
             }
 
