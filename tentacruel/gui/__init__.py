@@ -52,7 +52,7 @@ class ManagedGridFrame(Frame):
     def _add(self, name, widget_type, *args, **kwargs):
         grid_args = {"column", "columnspan", "row", "rowspan", "sticky"}
         gridkw = keep(kwargs, grid_args)
-        if "columnspan" in gridkw and type(gridkw["columnspan"]) == STAR:
+        if "columnspan" in gridkw and isinstance(gridkw["columnspan"], STAR):
             gridkw["columnspan"] = self._columns
 
         if "column" not in gridkw and "row" not in gridkw:
