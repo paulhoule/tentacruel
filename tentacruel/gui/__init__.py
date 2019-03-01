@@ -5,11 +5,11 @@ from tkinter import Frame
 from typing import Dict, Set
 
 
-def keep(source:Dict,keep_keys: Set):
-    return {key: value for (key,value) in source.items() if key in keep_keys}
+def keep(source: Dict, keep_keys: Set):
+    return {key: value for (key, value) in source.items() if key in keep_keys}
 
-def discard(source:Dict,discard_keys: Set):
-    return {key: value for (key,value) in source.items() if key not in discard_keys}
+def discard(source: Dict, discard_keys: Set):
+    return {key: value for (key, value) in source.items() if key not in discard_keys}
 
 class STAR():
     pass
@@ -18,9 +18,11 @@ class ManagedGridFrame(Frame):
     def __init__(
         self,
         master=None,
-        cnf={},
-        columns = 4,
+        cnf=None,
+        columns=4,
         **kw):
+        if not cnf:
+            cnf = {}
         Frame.__init__(self,master,cnf,**kw)
         self._columns = columns
         self._col=0
