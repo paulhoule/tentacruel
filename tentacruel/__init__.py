@@ -1,3 +1,6 @@
+# pylint: disable=missing-docstring
+# pylint: disable=invalid-name
+
 """
 Module to control Denon/Marantz
 """
@@ -22,13 +25,14 @@ HISTORY = 1026
 AUX = 1027
 FAVORITES = 1028
 
+#
 logger = getLogger(__name__)
 
 class HeosError(Exception):
-    def __init__(self,error_id,message):
+    def __init__(self, error_id, message):
         super().__init__(f"Heos error {error_id}: {message}")
-        self.error_id=error_id
-        self.message=message
+        self.error_id = error_id
+        self.message = message
 
 class HeosClientProtocol(asyncio.Protocol):
     """
@@ -52,8 +56,10 @@ class HeosClientProtocol(asyncio.Protocol):
         self._sequence = 1
         self._listeners = []
         self._progress_listeners = []
+        self.transport = None
+        self._players = []
 
-    def add_listener(self,listener):
+    def add_listener(self, listener):
         self._listeners += [listener]
 
     def add_progress_listener(self, listener):
@@ -92,8 +98,9 @@ class HeosClientProtocol(asyncio.Protocol):
                 jdata = json.loads(packet)
                 self._handle_response(jdata)
             except JSONDecodeError:
-                logger.error("Error parsing %s  as json",jdata)
+                logger.error("Error parsing %s  as json", jdata)
 
+    # pylint: disable=too-many-branches
     def _handle_response(self, jdata):
         """
         Handles JSON response from server.  JSON responses can be produced in response to
@@ -110,34 +117,45 @@ class HeosClientProtocol(asyncio.Protocol):
         if command.startswith("event/"):
             event = command[command.index("/"):]
             if not "message" in jdata["heos"]:
-                logger.debug("Got event of type [%s] with no message",event)
-                message={}
+                logger.debug("Got event of type [%s] with no message", event)
+                message = {}
             else:
-                message = {key: value[0] for key, value in parse_qs(jdata["heos"]["message"]).items()}
+                message = {
+                    key: value[0]
+                    for key, value
+                    in parse_qs(jdata["heos"]["message"]).items()
+                }
+            # pylint: disable=broad-except
             try:
                 self._handle_event(event, message)
             except Exception:
-                logger.error("Caught exception while in event handler for %s",event,exc_info=True)
+                logger.error("Caught exception while in event handler for %s",
+                             event,
+                             exc_info=True)
         else:
             try:
                 if jdata["heos"]["message"].startswith("command under process"):
                     return
 
-                message = {key: value[0] for key, value in parse_qs(jdata["heos"]["message"]).items()}
+                message = {
+                    key: value[0]
+                    for key, value
+                    in parse_qs(jdata["heos"]["message"]).items()
+                }
             except KeyError:
-                logger.error("Received HEOS reply for command %s without message",command)
+                logger.error("Received HEOS reply for command %s without message", command)
                 message = {}
 
             futures = self.inflight_commands[command]
             if "SEQUENCE" in message:
                 sequence = int(message["SEQUENCE"])
                 future = futures[sequence]
-                logger.debug("Removing %s",future)
+                logger.debug("Removing %s", future)
                 del futures[sequence]
             elif len(futures) == 1:
                 key = list(futures.keys())[0]
                 future = futures[key]
-                logger.debug("Removing %s",future)
+                logger.debug("Removing %s", future)
                 del futures[key]
             elif not futures:
                 raise ValueError("No future found to match command: " + command)
@@ -147,7 +165,7 @@ class HeosClientProtocol(asyncio.Protocol):
             if not jdata["heos"]["result"] == "success":
                 message = {key: value[0] for key, value in
                            parse_qs(jdata["heos"]["message"]).items()}
-                future.set_exception(HeosError(message["eid"],message["text"]))
+                future.set_exception(HeosError(message["eid"], message["text"]))
                 return
 
             if message and "payload" in jdata:
@@ -162,12 +180,12 @@ class HeosClientProtocol(asyncio.Protocol):
     # pylint: disable=no-self-use
     def _handle_event(self, event, message):
         for listener in self._listeners:
-            listener(event,message)
+            listener(event, message)
 
     def update_progress_listeners(self):
         count = 0
         for command in self.inflight_commands.values():
-            count += len (command)
+            count += len(command)
         for listener in self._progress_listeners:
             listener(count)
 
@@ -189,7 +207,7 @@ class HeosClientProtocol(asyncio.Protocol):
         await self.system.register_for_change_events()
         self._players = await _HeosPlayer(self).get_players()
         for player in self._players:
-            self.players[player["name"]]=_HeosPlayer(self,player["pid"])
+            self.players[player["name"]] = _HeosPlayer(self, player["pid"])
 
         if self._start_action:
             await self._start_action(self)
@@ -200,16 +218,16 @@ class HeosClientProtocol(asyncio.Protocol):
     def get_players(self):
         return self._players
 
-    def __getitem__(self,that):
-        for name,player in self.players.items():
-            if that==name:
+    def __getitem__(self, that):
+        for name, player in self.players.items():
+            if that == name:
                 return player
-            if str(player._pid) == str(that):
+            if str(player.pid()) == str(that):
                 return player
         raise KeyError(f"Couldn't find player with key {that}")
 
 
-    def _run_command(self, command: str, arguments: dict = {}) -> asyncio.Future:
+    def _run_command(self, command: str, **arguments) -> asyncio.Future:
         future = self._loop.create_future()
         this_event = self._sequence
         self._sequence += 1
@@ -221,10 +239,10 @@ class HeosClientProtocol(asyncio.Protocol):
 
         base_url = f"heos://{command}"
         if arguments:
-            arguments["SEQUENCE"]=this_event
+            arguments["SEQUENCE"] = this_event
 
         if arguments:
-            url = base_url + "?" + "&".join(f"{key}={value}" for (key,value) in arguments.items())
+            url = base_url + "?" + "&".join(f"{key}={value}" for (key, value) in arguments.items())
         else:
             url = base_url
 
@@ -233,5 +251,3 @@ class HeosClientProtocol(asyncio.Protocol):
         self.transport.write(cmd.encode("utf-8"))
 
         return future
-
-
