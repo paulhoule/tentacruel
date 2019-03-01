@@ -6,6 +6,15 @@ from . service import _HeosService
 class _HeosPlayer(_HeosService):
     prefix = "player"
 
+    #
+    # aid enumeration for 'add_to_queue'
+    #
+
+    PLAY_NOW = 1
+    PLAY_NEXT = 2
+    ADD_TO_END = 3
+    REPLACE_AND_PLAY = 4
+
     def __init__(self, protocol, player_id=None):
         super().__init__(protocol)
         self.play_states = {"stop", "pause", "play"}
@@ -136,7 +145,7 @@ class _HeosPlayer(_HeosService):
 
     async def add_to_queue(self, sid=None, cid=None, mid=None, aid=None):
         if aid is None:
-            aid = 4
+            aid = self.REPLACE_AND_PLAY
 
         arguments = dict(
             pid=self._pid,

@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 from phue import Bridge
-from tentacruel import HeosClientProtocol, HEOS_PORT
+from tentacruel import HeosClientProtocol, HEOS_PORT, _HeosPlayer
 
 logger = getLogger(__name__)
 if "LOGGING_LEVEL" in environ:
@@ -130,7 +130,7 @@ class Application:
         def __init__(self, parent):
             self._hue_target = ["group", "3"]
             self.parent = parent
-            self._player = None
+            self._player: _HeosPlayer = None
             self._lights = Application.LightCommands(parent)
             self._sensor_states = {}
             self._off_at = None
@@ -173,14 +173,16 @@ class Application:
             if not parameters:
                 await self._player.set_play_state("play")
             else:
-                aid = 4
+                await self._player.clear_queue()
+
                 for track in parameters:
                     for entry in tracks:
                         if entry["key"] == track:
                             song = dict(entry)
                             del song["key"]
-                            await self._player.add_to_queue(aid=aid, **song)
-                            aid = 3
+                            await self._player.add_to_queue(aid=_HeosPlayer.ADD_TO_END, **song)
+
+                await self._player.set_play_state("play")
 
         async def stop(self, parameters):
             if parameters:
