@@ -177,7 +177,7 @@ class GeneralBrowser(ManagedGridFrame):
                   text=item["name"],
                   width=100, height=1,
                   bg="white" if i % 2 else "lightgrey",
-                  command=self.browse_to_item(**keep(keys,{"sid","cid"})),
+                  command=self.browse_to_item(**keep(keys, {"sid", "cid"})),
                   row=i + 1,
                   column=3
                   )
