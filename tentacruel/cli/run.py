@@ -173,8 +173,6 @@ class Application:
             if not parameters:
                 await self._player.set_play_state("play")
             else:
-                await self._player.set_play_state("stop")
-                await asyncio.sleep(1)
                 await self._player.clear_queue()
 
                 for track in parameters:
@@ -186,9 +184,7 @@ class Application:
                 await asyncio.sleep(1)
                 await self._player.set_play_mode()
                 await self._player.set_play_state("play")
-                await asyncio.sleep(5)
-                await self._player.get_now_playing_media()
-                await asyncio.sleep(5)
+                await asyncio.sleep(10)
 
         async def stop(self, parameters):
             if parameters:
@@ -359,13 +355,13 @@ class Application:
                 return True
 
             await self.player([player]) # Not the same bedroom\
-            await self.play([request_voice])
+            await self.play(["Silence05", request_voice])
 
             for _ in range(0, 200):
                 await asyncio.sleep(1)
                 lights = self._lights._get_unreachable_lights(group)
                 if not lights:
-                    await self.play([thankyou_voice])
+                    await self.play(["Silence05", thankyou_voice])
                     group_id = self._lights._bridge.get_group_id_by_name(group)
                     self._lights._bridge.set_group(group_id, "on", False)
                     return False

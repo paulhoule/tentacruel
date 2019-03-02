@@ -1,6 +1,6 @@
 # pylint: disable=missing-docstring
 from _asyncio import Future
-from . service import _HeosService,HeosError
+from . service import _HeosService, HeosError
 
 # pylint: disable=too-many-public-methods
 class _HeosPlayer(_HeosService):
@@ -201,7 +201,7 @@ class _HeosPlayer(_HeosService):
                 pid=self._pid,
             )
         except HeosError as error:
-            if error.error_id==4:
+            if error.error_id == 4:
                 return
             raise
 
