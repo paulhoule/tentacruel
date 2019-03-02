@@ -11,7 +11,7 @@ from json import JSONDecodeError
 from urllib.parse import parse_qs
 from logging import getLogger
 
-from tentacruel.service import _HeosService
+from tentacruel.service import _HeosService, HeosError
 from tentacruel.system import _HeosSystem
 from tentacruel.browse import _HeosBrowse
 from tentacruel.player import _HeosPlayer
@@ -27,12 +27,6 @@ FAVORITES = 1028
 
 #
 logger = getLogger(__name__)
-
-class HeosError(Exception):
-    def __init__(self, error_id, message):
-        super().__init__(f"Heos error {error_id}: {message}")
-        self.error_id = error_id
-        self.message = message
 
 class HeosClientProtocol(asyncio.Protocol):
     """
@@ -239,7 +233,11 @@ class HeosClientProtocol(asyncio.Protocol):
 
         base_url = f"heos://{command}"
         if arguments:
-            arguments["SEQUENCE"] = this_event
+            if "SEQUENCE" not in arguments:
+                arguments["SEQUENCE"] = this_event
+
+            if not arguments["SEQUENCE"]:
+                del arguments["SEQUENCE"]
 
         if arguments:
             url = base_url + "?" + "&".join(f"{key}={value}" for (key, value) in arguments.items())

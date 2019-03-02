@@ -163,10 +163,10 @@ class Application(ManagedGridFrame):
         await self._player().play_stream(sid, cid, mid, name)
 
     async def play_queue(self, qid=None, pid=None):
-        await self._player().play_queue(qid, pid)
+        await self._player().play_queue(qid)
 
     async def remove_from_queue(self, qid=None, pid=None):
-        await self._player().remove_from_queue(qid, pid)
+        await self._player().remove_from_queue(qid)
 
     def quit(self):
         self.alive = False

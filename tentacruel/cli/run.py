@@ -173,6 +173,8 @@ class Application:
             if not parameters:
                 await self._player.set_play_state("play")
             else:
+                await self._player.set_play_state("stop")
+                await asyncio.sleep(1)
                 await self._player.clear_queue()
 
                 for track in parameters:
@@ -181,8 +183,12 @@ class Application:
                             song = dict(entry)
                             del song["key"]
                             await self._player.add_to_queue(aid=_HeosPlayer.ADD_TO_END, **song)
-
+                await asyncio.sleep(1)
+                await self._player.set_play_mode()
                 await self._player.set_play_state("play")
+                await asyncio.sleep(5)
+                await self._player.get_now_playing_media()
+                await asyncio.sleep(5)
 
         async def stop(self, parameters):
             if parameters:

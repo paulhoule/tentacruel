@@ -1,6 +1,13 @@
 # pylint: disable=missing-docstring
 import asyncio
 
+class HeosError(Exception):
+    def __init__(self, error_id, message):
+        super().__init__(f"Heos error {error_id}: {message}")
+        self.error_id = int(error_id)
+        self.message = message
+
+
 # pylint: disable=too-few-public-methods
 class _HeosService():
     def __init__(self, protocol):
