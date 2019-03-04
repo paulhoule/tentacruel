@@ -342,12 +342,16 @@ class Application:
             if parameters:
                 raise ValueError("defend command takes no parameters")
 
-            if not await self.enforce_lights(
-                    "Bedroom", "Bedroom", "IvyTurnOnBedroom", "IvyThankYou"
-            ):
-                return
+            light_zones = [
+                ("Bedroom", "Bedroom", "IvyTurnOnBedroom", "IvyThankYou"),
+                ("Hallway", "Room23", "UpstairsHallway", "JoeyThankYou"),
+                ("Bottom of Stairs", "Kitchen", "BrianDownstairs", "IvyThankYou")
+            ]
 
-            await self.enforce_lights("Hallway", "Room23", "UpstairsHallway", "JoeyThankYou")
+            for zone in light_zones:
+                lights_ok = await self.enforce_lights(*zone)
+                if not lights_ok:
+                    break
 
         async def enforce_lights(self, group, player, request_voice, thankyou_voice):
             lights = self._lights._get_unreachable_lights(group)
