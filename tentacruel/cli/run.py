@@ -128,10 +128,11 @@ class Application:
 
     class Commands:
         def __init__(self, parent):
-            self._hue_targets = [
-                ["group", "3"],
-                ["6"]
-            ]
+            self._hue_targets = {
+                "upstairs-north": 2,
+                "upstairs-south": 3,
+                "downstairs-hallway": 6
+            }
             self.parent = parent
             self._player: _HeosPlayer = None
             self._lights = Application.LightCommands(parent)
@@ -431,10 +432,10 @@ class Application:
 
         async def _react_to_event(self, event):
             sensors = {
-                "a76876ab-6ded-4fb5-9955-76dd0cbb6525",
-                "c9d2e33e-258b-48c5-af1a-29a95f189d80",
-                "bf423230-3495-4375-8033-60b4f7d3455c",
-                "a20bab2e-a7d0-4c93-8723-27a7bf3299b6"       # bottom of stairs
+                "a76876ab-6ded-4fb5-9955-76dd0cbb6525": "upstairs-south",
+                "c9d2e33e-258b-48c5-af1a-29a95f189d80": "upstairs-north",
+                "bf423230-3495-4375-8033-60b4f7d3455c": "upstairs-mid",
+                "a20bab2e-a7d0-4c93-8723-27a7bf3299b6": "downstairs-hallway"
             }
 
             if event["deviceId"] in sensors:
