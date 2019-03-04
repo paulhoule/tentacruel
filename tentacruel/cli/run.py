@@ -128,7 +128,10 @@ class Application:
 
     class Commands:
         def __init__(self, parent):
-            self._hue_target = ["group", "3"]
+            self._hue_targets = [
+                ["group", "3"],
+                ["6"]
+            ]
             self.parent = parent
             self._player: _HeosPlayer = None
             self._lights = Application.LightCommands(parent)
@@ -419,8 +422,12 @@ class Application:
                             )
 
                 if self._off_at and time.time() >= self._off_at:
-                    await self.light(self._hue_target + ["off"])
+                    await self.command_lights(self._hue_targets, "off")
                     self._off_at = None
+
+        async def command_lights(self, light_list, *command):
+            for light in light_list:
+                await self.light(light + list(command))
 
         async def _react_to_event(self, event):
             sensors = {
@@ -435,7 +442,7 @@ class Application:
                     self._sensor_states[event["deviceId"]] = event["value"]
 
                 if any(x == "active" for x in self._sensor_states.values()):
-                    await self.light(self._hue_target + ["on"])
+                    await self.command_lights(self._hue_targets, "on")
                     self._off_at = None
                 else:
                     self._off_at = time.time() + 150  # seconds
