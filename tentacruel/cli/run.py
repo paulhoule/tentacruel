@@ -6,7 +6,6 @@ import datetime
 import json
 import re
 import sys
-import time
 from logging import getLogger, StreamHandler
 from os import environ
 from pathlib import Path
@@ -62,6 +61,78 @@ def sun_time(which_one="sunrise"):
     t, _ = almanac.find_discrete(begin, end, almanac.sunrise_sunset(e, here))
     idx = 0 if which_one == "sunrise" else 1
     return t[idx].astimezone(local)
+
+
+class LightZone:
+    """
+    Starting to shape up architecturally,  might event have it be testable!
+
+    This class represents a set of lights whose on-and-off behavior in response to
+    motion is related to each others.  It clusters all of the state involved in one
+    place.
+
+    """
+    VERTICAL = "vertical"
+    INDEPENDENT = "independent"
+
+    def __init__(self):
+        self.major = LightZone.INDEPENDENT
+        self.light_zones = {
+            'downstairs-hallway': 'bottom',
+            'upstairs-north': 'top',
+            'upstairs-bottom': 'top'
+        }
+
+        self.sensor_zones = {
+            "upstairs-south": 'top',
+            "upstairs-north": 'top',
+            "upstairs-mid": 'top',
+            "downstairs-hallway": 'bottom'
+        }
+
+        self._hue_targets = {
+            "upstairs-north": 2,
+            "upstairs-south": 3,
+            "downstairs-hallway": 6
+        }
+
+        self.sensors = {
+            "a76876ab-6ded-4fb5-9955-76dd0cbb6525": "upstairs-south",
+            "c9d2e33e-258b-48c5-af1a-29a95f189d80": "upstairs-north",
+            "bf423230-3495-4375-8033-60b4f7d3455c": "upstairs-mid",
+            "a20bab2e-a7d0-4c93-8723-27a7bf3299b6": "downstairs-hallway"
+        }
+
+        self.timeouts = {
+            "bottom": None,
+            "top": None,
+        }
+
+    def on_event(self, event, when):
+        """
+
+        :param event:
+        :return:
+        """
+
+    def on_tick(self, when):
+        """
+
+        :param when:
+        :return:
+        """
+
+    def execute(self, commands):
+        """
+        The commands here are tuples of the form ("l", light_id, parameter, value)
+        if it is a light number and "g" if it is a group number.  These are
+        passed through a central point so they can logged,  mocked,  etc.
+
+        :param commands:
+        :return:
+        """
+
+
 
 
 # pylint: disable=too-few-public-methods
@@ -128,11 +199,6 @@ class Application:
 
     class Commands:
         def __init__(self, parent):
-            self._hue_targets = {
-                "upstairs-north": 2,
-                "upstairs-south": 3,
-                "downstairs-hallway": 6
-            }
             self.parent = parent
             self._player: _HeosPlayer = None
             self._lights = Application.LightCommands(parent)
@@ -422,31 +488,26 @@ class Application:
                                 react_error_count
                             )
 
-                if self._off_at and time.time() >= self._off_at:
-                    await self.command_lights(self._hue_targets, "off")
-                    self._off_at = None
+                # if self._off_at and time.time() >= self._off_at:
+                #     await self.command_lights(self._hue_targets, "off")
+                #     self._off_at = None
 
         async def command_lights(self, light_list, *command):
             for light in light_list:
                 await self.light(light + list(command))
 
         async def _react_to_event(self, event):
-            sensors = {
-                "a76876ab-6ded-4fb5-9955-76dd0cbb6525": "upstairs-south",
-                "c9d2e33e-258b-48c5-af1a-29a95f189d80": "upstairs-north",
-                "bf423230-3495-4375-8033-60b4f7d3455c": "upstairs-mid",
-                "a20bab2e-a7d0-4c93-8723-27a7bf3299b6": "downstairs-hallway"
-            }
+            pass
 
-            if event["deviceId"] in sensors:
-                if event["attribute"] == "motion":
-                    self._sensor_states[event["deviceId"]] = event["value"]
-
-                if any(x == "active" for x in self._sensor_states.values()):
-                    await self.command_lights(self._hue_targets, "on")
-                    self._off_at = None
-                else:
-                    self._off_at = time.time() + 150  # seconds
+            # if event["deviceId"] in sensors:
+            #     if event["attribute"] == "motion":
+            #         self._sensor_states[event["deviceId"]] = event["value"]
+            #
+            #     if any(x == "active" for x in self._sensor_states.values()):
+            #         await self.command_lights(self._hue_targets, "on")
+            #         self._off_at = None
+            #     else:
+            #         self._off_at = time.time() + 150  # seconds
 
         async def _poll_sqs(self, collection, sqs):
             response = sqs.receive_message(
