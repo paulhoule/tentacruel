@@ -92,5 +92,3 @@ def test_independent_mode():
     assert({x[2] for x in commands} == {'on'})
     assert({x[3] for x in commands} == {False})
     effector.reset_mock()
-
-test_independent_mode()

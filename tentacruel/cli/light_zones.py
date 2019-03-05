@@ -1,5 +1,5 @@
 # pylint: disable=missing-docstring
-
+# pylint: disable=too-many-instance-attributes
 class LightZone:
     """
     Starting to shape up architecturally,  might event have it be testable!
@@ -87,7 +87,7 @@ class LightZone:
         :return:
         """
         commands = []
-        for zone,alarm in self.alarms.items():
+        for zone, alarm in self.alarms.items():
             if alarm and  when >= alarm:
                 for light, light_zone in self.light_zones.items():
                     if light_zone == zone:
