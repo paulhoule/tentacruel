@@ -12,7 +12,7 @@ class LightZone:
     VERTICAL = "vertical"
     INDEPENDENT = "independent"
 
-    def __init__(self, effector):
+    def __init__(self, effector, timeouts=None):
         self.effector = effector
         self.major = LightZone.INDEPENDENT
         self.light_zones = {
@@ -41,17 +41,14 @@ class LightZone:
             "a20bab2e-a7d0-4c93-8723-27a7bf3299b6": "downstairs-hallway"
         }
 
-        self.timeouts = {
-            "bottom": 200,
-            "top": 500,
-        }
+        self.timeouts = timeouts
 
         self.alarms = {
             "bottom": None,
             "top": None,
         }
 
-    def on_event(self, event, when):
+    async def on_event(self, event, when):
         """
 
         :param event:
@@ -80,7 +77,7 @@ class LightZone:
             zone = self.sensor_zones[sensor]
             self.alarms[zone] = when + self.timeouts[zone]
 
-    def on_tick(self, when):
+    async def on_tick(self, when):
         """
 
         :param when:

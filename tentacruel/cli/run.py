@@ -135,7 +135,10 @@ class Application:
             self._off_at = None
             self._prefixes = {"list"}
             self._light_zones = [
-                LightZone(None)
+                LightZone(
+                    self.send_to_hue,
+                    timeouts={"bottom": 60, "top": 120}
+                )
             ]
 
         # pylint: disable=protected-access
@@ -412,7 +415,7 @@ class Application:
                         await self._react_to_event(event)
                         react_error_count = 0
                     except Exception as ex:
-                        logger(ex)
+                        logger.error(ex)
                         react_error_count += 1
                         if react_error_count > 1:
                             logger.error(
@@ -423,14 +426,20 @@ class Application:
                 for zone in self._light_zones:
                     await zone.on_tick(time.time())
 
-        async def command_lights(self, light_list, *command):
-            for light in light_list:
-                await self.light(light + list(command))
-
         async def _react_to_event(self, event):
             event_time = time.time()
             for zone in self._light_zones:
                 await zone.on_event(event, event_time)
+
+        def send_to_hue(self, commands):
+            for (device_type, *arguments) in commands:
+                if device_type == "l":
+                    self._lights._bridge.set_light(*arguments)
+                elif device_type == "g":
+                    self._lights._bridge.set_group(*arguments)
+                else:
+                    raise ValueError("l and g are the only allowed command types here")
+
 
             # if event["deviceId"] in sensors:
             #     if event["attribute"] == "motion":
