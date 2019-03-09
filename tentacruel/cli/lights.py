@@ -5,7 +5,6 @@ a sane way to add or remove new commands that we can firm up over time.
 
 import re
 from typing import List
-
 from phue import Bridge
 
 # pylint: disable=too-few-public-methods
@@ -30,7 +29,7 @@ class LightCommands:
         self._bridge = Bridge()
 
     # pylint: disable=invalid-name
-    def do(self, parameters: List[str]):
+    async def do(self, parameters: List[str]):
         """
         Implement light control commands such as the following::
 

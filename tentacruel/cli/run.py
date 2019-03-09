@@ -12,9 +12,11 @@ from pathlib import Path
 import time
 
 import yaml
-from tentacruel import HeosClientProtocol, HEOS_PORT, _HeosPlayer
+from tentacruel import HeosClientProtocol, _HeosPlayer
 from tentacruel.cli import LightZone
+from tentacruel.cli.control_lights import ControlLights
 from tentacruel.cli.lights import LightCommands
+from tentacruel.cli.drain_sqs import DrainSQS
 
 logger = getLogger(__name__)
 if "LOGGING_LEVEL" in environ:
@@ -71,12 +73,13 @@ class Application:
         self.commands = Application.Commands(self)
         self._heos = None
 
-
+    # pylint: disable=too-many-instance-attributes
     class Commands:
         def __init__(self, parent):
             self.parent = parent
             self._player: _HeosPlayer = None
             self._lights = LightCommands(parent)
+            self._queue = DrainSQS(config)
             self._sensor_states = {}
             self._off_at = None
             self._prefixes = {"list"}
@@ -92,7 +95,14 @@ class Application:
             return self.parent._heos
 
         async def light(self, parameters):
-            self._lights.do(parameters)
+            await self._lights.do(parameters)
+
+        async def drain_sqs(self, parameters):
+            await self._queue.do(parameters)
+
+        async def control_lights(self, parameters):
+            control = ControlLights(config)
+            await control.do(parameters)
 
         async def player(self, parameters):
             if len(parameters) != 1:
@@ -321,57 +331,6 @@ class Application:
                     self._lights._bridge.set_group(group_id, "on", False)
                     return False
 
-        def _connect_to_adb(self):
-            from arango import ArangoClient
-            client = ArangoClient(**config["arangodb"]["events"]["client"])
-            return client.db(**config["arangodb"]["events"]["database"])
-
-        async def process_sensor_events(self, parameters):
-            if parameters:
-                raise ValueError("process_sensor_events takes no parameters")
-
-            adb = self._connect_to_adb()
-            collection = adb.collection("sqs_events")
-            import boto3
-            sqs = boto3.client(
-                "sqs",
-                aws_access_key_id=config["aws"]["aws_access_key_id"],
-                aws_secret_access_key=config["aws"]["aws_secret_access_key"],
-                region_name=config["aws"]["region_name"])
-            poll_error_count = 0
-            react_error_count = 0
-
-            while True:
-                # pylint: disable=broad-except
-                try:
-                    events = await self._poll_sqs(collection, sqs)
-                    poll_error_count = 0
-                except Exception as ex:
-                    logger.error(ex)
-                    poll_error_count += 1
-                    if poll_error_count > 1:
-                        logger.error("%d consecutive errors polling from SQS queue"
-                                     , poll_error_count)
-
-                    await asyncio.sleep(10)
-                    continue
-
-                for event in events:
-                    try:
-                        await self._react_to_event(event)
-                        react_error_count = 0
-                    except Exception as ex:
-                        logger.error(ex)
-                        react_error_count += 1
-                        if react_error_count > 1:
-                            logger.error(
-                                "%d consecutive errors reacting to events",
-                                react_error_count
-                            )
-
-                for zone in self._light_zones:
-                    await zone.on_tick(time.time())
-
         async def _react_to_event(self, event):
             event_time = time.time()
             for zone in self._light_zones:
@@ -386,49 +345,10 @@ class Application:
                 else:
                     raise ValueError("l and g are the only allowed command types here")
 
-
-            # if event["deviceId"] in sensors:
-            #     if event["attribute"] == "motion":
-            #         self._sensor_states[event["deviceId"]] = event["value"]
-            #
-            #     if any(x == "active" for x in self._sensor_states.values()):
-            #         await self.command_lights(self._hue_targets, "on")
-            #         self._off_at = None
-            #     else:
-            #         self._off_at = time.time() + 150  # seconds
-
-        async def _poll_sqs(self, collection, sqs):
-            response = sqs.receive_message(
-                QueueUrl=config["aws"]["queue_url"],
-                MaxNumberOfMessages=10,
-                WaitTimeSeconds=int(environ.get("WAIT_TIME_SECONDS", 20))
-            )
-            event_batch = []
-            delete_batch = []
-            if "Messages" not in response:
-                if response["ResponseMetadata"]["HTTPStatusCode"] != 200:
-                    logger.error("Got error while receiving queue messages; response: %s", response)
-                    raise RuntimeError("Error receiving queue messages")
-            else:
-                for message in response["Messages"]:
-                    delete_batch.append({
-                        "Id": message["MessageId"],
-                        "ReceiptHandle": message["ReceiptHandle"]
-                    })
-                    body = json.loads(message["Body"])
-                    for event in body:
-                        device_event = dict(event["deviceEvent"])
-                        device_event["_key"] = device_event["eventId"]
-                        device_event["eventTime"] = event["eventTime"]
-                        del device_event["eventId"]
-                        event_batch.append(device_event)
-
-                collection.insert_many(event_batch)
-                sqs.delete_message_batch(
-                    QueueUrl=config["aws"]["queue_url"],
-                    Entries=delete_batch
-                )
-            return event_batch
+        def _connect_to_adb(self):
+            from arango import ArangoClient
+            client = ArangoClient(**config["arangodb"]["events"]["client"])
+            return client.db(**config["arangodb"]["events"]["database"])
 
         async def read_smartthings_configuration(self, parameters):
             if parameters:
@@ -485,11 +405,11 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     application = Application(sys.argv)
 
-    coro = loop.create_connection(
-        lambda: HeosClientProtocol(loop, start_action=application.run),
-        RECEIVER_IP, HEOS_PORT
-    )
+#    coro = loop.create_connection(
+#        lambda: HeosClientProtocol(loop, start_action=application.run),
+#        RECEIVER_IP, HEOS_PORT
+#    )
 
-    loop.run_until_complete(coro)
+    loop.run_until_complete(application.run(None))
     loop.run_forever()
     loop.close()
