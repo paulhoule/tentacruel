@@ -2,11 +2,12 @@
 """
 Command-line commands that operate on message queues.
 """
-
+import json
 from asyncio import get_event_loop
 from logging import getLogger
 
 from aio_pika import connect_robust, ExchangeType
+from tentacruel.cli import LightZone
 
 logger = getLogger(__name__)
 # pylint: disable=too-few-public-methods
@@ -15,9 +16,18 @@ class ControlLights:
     Implementation of Command Line command to drain events from rabbitmq and have
     appropriate side effects on the lights!
     """
-    def __init__(self, config):
+    def __init__(self, config, lights):
         self._prefixes = {}
         self.config = config
+        # pylint: disable=protected-access
+        self.bridge = lights._bridge
+
+        self.zones = [
+            LightZone(
+                self.send_to_hue,
+                timeouts={"bottom": 60, "top": 120}
+            )
+        ]
 
     async def do(self, parameters):
         """
@@ -48,4 +58,21 @@ class ControlLights:
             async with queue.iterator() as messages:
                 async for message in messages:
                     with message.process():
-                        print(message.body)
+                        for zone in self.zones:
+                            event = json.loads(message.body)
+                            await zone.on_event(event, get_event_loop().time())
+
+    def send_to_hue(self, commands):
+        """
+        Send commands ro hue
+
+        :param commands:
+        :return:
+        """
+        for (device_type, *arguments) in commands:
+            if device_type == "l":
+                self.bridge.set_light(*arguments)
+            elif device_type == "g":
+                self.bridge.set_group(*arguments)
+            else:
+                raise ValueError("l and g are the only allowed command types here")

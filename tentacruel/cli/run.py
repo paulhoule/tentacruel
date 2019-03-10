@@ -9,11 +9,9 @@ import sys
 from logging import getLogger, StreamHandler
 from os import environ
 from pathlib import Path
-import time
 
 import yaml
-from tentacruel import HeosClientProtocol, _HeosPlayer
-from tentacruel.cli import LightZone
+from tentacruel import HeosClientProtocol, _HeosPlayer, HEOS_PORT
 from tentacruel.cli.control_lights import ControlLights
 from tentacruel.cli.lights import LightCommands
 from tentacruel.cli.drain_sqs import DrainSQS
@@ -30,7 +28,6 @@ with open(Path.home() / ".tentacruel" / "config.yaml") as a_stream:
 RECEIVER_IP = config["server"]["ip"]
 players = config["players"]
 tracks = config["tracks"]
-
 
 def separate_commands(arguments):
     commands = []
@@ -83,16 +80,26 @@ class Application:
             self._sensor_states = {}
             self._off_at = None
             self._prefixes = {"list"}
-            self._light_zones = [
-                LightZone(
-                    self.send_to_hue,
-                    timeouts={"bottom": 60, "top": 120}
-                )
-            ]
+
+            self._hcp = None
 
         # pylint: disable=protected-access
-        def _heos(self):
-            return self.parent._heos
+        async def _heos(self):
+            if not self._hcp:
+                wait_on = asyncio.get_event_loop().create_future()
+                def client_factory():
+                    return HeosClientProtocol(
+                        asyncio.get_event_loop(),
+                        start_action=wait_on.set_result,
+                        halt=False
+                    )
+                await asyncio.get_event_loop().create_connection(
+                    client_factory,
+                    RECEIVER_IP, HEOS_PORT
+                )
+                self._hcp = await wait_on
+
+            return self._hcp
 
         async def light(self, parameters):
             await self._lights.do(parameters)
@@ -101,7 +108,7 @@ class Application:
             await self._queue.do(parameters)
 
         async def control_lights(self, parameters):
-            control = ControlLights(config)
+            control = ControlLights(config, self._lights)
             await control.do(parameters)
 
         async def player(self, parameters):
@@ -112,7 +119,7 @@ class Application:
             player_specification = parameters[0]
             pid = self._parse_player_specification(player_specification)
 
-            self._player = self._heos()[pid]
+            self._player = (await self._heos())[pid]
 
         # pylint: disable=no-self-use
         def _parse_player_specification(self, player_specification):
@@ -130,6 +137,20 @@ class Application:
                     " registered in the configuration file")
             return pid
 
+        # what is to be done...
+        #
+        # if I want to play an audio clip it doesn't work if the target in Room23
+        # (the AVR) if the AVR was in Bluetooth mode ore has recently been in
+        # Bluetooth mode.
+        #
+        # I think that the player can be kicked out of Bluetooth mode if we play a song
+        # with aid=4,  but just clearing the queue and doing the ADD_TO_END thing
+        # seems to leave it in Bluetooth mode.
+        #
+        # My hunch is that we can check the player to detect Bluetooth mode and then
+        # try the aid=4 trick or something similar.  Probably we can get away with
+        # playing a very short clip,  but I'd rather research this tomorrow.
+        #
         async def play(self, parameters):
             if not parameters:
                 await self._player.set_play_state("play")
@@ -142,10 +163,9 @@ class Application:
                             song = dict(entry)
                             del song["key"]
                             await self._player.add_to_queue(aid=_HeosPlayer.ADD_TO_END, **song)
-                await asyncio.sleep(1)
                 await self._player.set_play_mode()
                 await self._player.set_play_state("play")
-                await asyncio.sleep(10)
+
 
         async def stop(self, parameters):
             if parameters:
@@ -185,7 +205,7 @@ class Application:
             if parameters:
                 raise ValueError("The list groups command takes no arguments")
 
-            result = await self._heos().group.get_groups()
+            result = await (await self._heos()).group.get_groups()
             if not result:
                 print(f"The HEOS system has no groups.")
             idx = 1
@@ -202,24 +222,24 @@ class Application:
             if parameters:
                 raise ValueError("The clear_groups command takes no arguments")
 
-            result = await self._heos().group.get_groups()
+            result = await (await self._heos()).group.get_groups()
             for group in result:
                 leader = [
                     player["pid"]
                     for player in group["players"]
                     if player["role"] == "leader"
                 ]
-                await self._heos().group.set_group(leader)
+                await (await self._heos()).group.set_group(leader)
 
         async def group(self, parameters):
             if not parameters:
                 raise ValueError("You must specify multiple player names to create a group")
 
             if parameters == ['all']:
-                pid_list = [player.pid() for player in self._heos().players.values()]
+                pid_list = [player.pid() for player in (await self._heos()).players.values()]
             else:
                 pid_list = [self._parse_player_specification(x) for x in parameters]
-            await self._heos().group.set_group(pid_list)
+            await (await (await self._heos())).group.set_group(pid_list)
 
         # pylint: disable=too-many-branches
         async def wait(self, parameters):
@@ -330,20 +350,6 @@ class Application:
                     group_id = self._lights._bridge.get_group_id_by_name(group)
                     self._lights._bridge.set_group(group_id, "on", False)
                     return False
-
-        async def _react_to_event(self, event):
-            event_time = time.time()
-            for zone in self._light_zones:
-                await zone.on_event(event, event_time)
-
-        def send_to_hue(self, commands):
-            for (device_type, *arguments) in commands:
-                if device_type == "l":
-                    self._lights._bridge.set_light(*arguments)
-                elif device_type == "g":
-                    self._lights._bridge.set_group(*arguments)
-                else:
-                    raise ValueError("l and g are the only allowed command types here")
 
         def _connect_to_adb(self):
             from arango import ArangoClient
