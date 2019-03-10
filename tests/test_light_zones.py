@@ -1,15 +1,20 @@
+import asyncio
+from asyncio import get_event_loop
 from unittest.mock import MagicMock
 
 from tentacruel.cli import LightZone
 
-async def test_independent_mode():
+def test_independent_mode():
+    asyncio.run(_test_independent_mode())
+
+async def _test_independent_mode():
     now = 0
     effector = MagicMock()
     timeouts = {
         "bottom": 200,
         "top": 500,
     }
-    zone = LightZone(effector)
+    zone = LightZone(effector,timeouts=timeouts)
     await zone.on_event({
         "deviceId": "a76876ab-6ded-4fb5-9955-76dd0cbb6525",
         "attribute": "moe",
@@ -39,7 +44,7 @@ async def test_independent_mode():
     },now)
     effector.assert_not_called()
 
-    zone.on_tick(now+100)
+    await zone.on_tick(now+100)
     effector.assert_not_called()
 
     await zone.on_event({
