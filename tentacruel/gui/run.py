@@ -9,7 +9,7 @@ from os import environ
 from pathlib import Path
 
 import yaml
-from tentacruel import HeosClientProtocol, HEOS_PORT
+from tentacruel import HeosClientProtocol
 from tentacruel.gui import ManagedGridFrame
 from tentacruel.gui.browser import SourceBrowser, GeneralBrowser, \
     wrap_window, PlaylistBrowser, wrap_scrollbar
