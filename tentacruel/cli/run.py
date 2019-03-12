@@ -68,7 +68,7 @@ class Application:
     def __init__(self, argv):
         self.argv = argv
         self.commands = Application.Commands(self)
-        self._heos_client = None
+
 
     # pylint: disable=too-many-instance-attributes
     class Commands:
@@ -79,11 +79,14 @@ class Application:
             self._sensor_states = {}
             self._off_at = None
             self._prefixes = {"list"}
-            self._hcp = None
+            self._heos_client = None
 
-        def _heos(self):
-            # pylint: disable=protected-access
-            return self.parent._heos_client
+        async def _heos(self):
+            if not self._heos_client:
+                self._heos_client = HeosClientProtocol(config["server"]["ip"])
+                await self._heos_client.setup()
+
+            return self._heos_client
 
         async def light(self, parameters):
             await self._lights.do(parameters)
@@ -104,7 +107,8 @@ class Application:
             player_specification = parameters[0]
             pid = self._parse_player_specification(player_specification)
 
-            self._player = self._heos()[pid]
+            heos = await self._heos()
+            self._player = heos[pid]
 
         # pylint: disable=no-self-use
         def _parse_player_specification(self, player_specification):
@@ -191,7 +195,8 @@ class Application:
             if parameters:
                 raise ValueError("The list groups command takes no arguments")
 
-            result = await self._heos().group.get_groups()
+            heos = await self._heos()
+            result = await heos.group.get_groups()
             if not result:
                 print(f"The HEOS system has no groups.")
             idx = 1
@@ -208,24 +213,26 @@ class Application:
             if parameters:
                 raise ValueError("The clear_groups command takes no arguments")
 
-            result = await self._heos().group.get_groups()
+            heos = await self._heos()
+            result = await heos.group.get_groups()
             for group in result:
                 leader = [
                     player["pid"]
                     for player in group["players"]
                     if player["role"] == "leader"
                 ]
-                await self._heos().group.set_group(leader)
+                await heos.group.set_group(leader)
 
         async def group(self, parameters):
             if not parameters:
                 raise ValueError("You must specify multiple player names to create a group")
 
+            heos = await self._heos()
             if parameters == ['all']:
-                pid_list = [player.pid() for player in self._heos().players.values()]
+                pid_list = [player.pid() for player in heos.players.values()]
             else:
                 pid_list = [self._parse_player_specification(x) for x in parameters]
-            await self._heos().group.set_group(pid_list)
+            await heos.group.set_group(pid_list)
 
         # pylint: disable=too-many-branches
         async def wait(self, parameters):
@@ -371,9 +378,6 @@ class Application:
                     url = None
 
     async def run(self):
-        self._heos_client = HeosClientProtocol(config["server"]["ip"])
-        await self._heos_client.setup()
-
         if len(self.argv) == 1:
             self.help()
 
