@@ -399,12 +399,6 @@ class Application:
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     application = Application(sys.argv)
-
-#    coro = loop.create_connection(
-#        lambda: HeosClientProtocol(loop, start_action=application.run),
-#        RECEIVER_IP, HEOS_PORT
-#    )
-
     loop.run_until_complete(application.run())
     loop.run_forever()
     loop.close()

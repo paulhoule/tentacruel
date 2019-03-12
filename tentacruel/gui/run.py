@@ -349,23 +349,19 @@ async def run_tk(root, interval=0.05):
         if "application has been destroyed" not in e.args[0]:
             raise
 
-async def gui_thread():
-    await run_tk(app)
-
 hcp = None
-def start_hcp():
+async def start_hcp():
     # pylint: disable=global-statement
     global hcp
     global app
-    hcp = HeosClientProtocol(asyncio.get_event_loop())
+    hcp = HeosClientProtocol(RECEIVER_IP)
+    await hcp.setup()
+    await app.comms_up(hcp)
+    await run_tk(app)
     return hcp
 
 async def main():
-    coro = asyncio.get_event_loop().create_connection(
-        start_hcp,
-        RECEIVER_IP, HEOS_PORT
-    )
-    await asyncio.gather(gui_thread(), coro)
+    await start_hcp()
 
 app = Application()
 app.title = "Never lock up!"
