@@ -357,7 +357,7 @@ def start_hcp():
     # pylint: disable=global-statement
     global hcp
     global app
-    hcp = HeosClientProtocol(asyncio.get_event_loop(), halt=False, start_action=app.comms_up)
+    hcp = HeosClientProtocol(asyncio.get_event_loop())
     return hcp
 
 async def main():

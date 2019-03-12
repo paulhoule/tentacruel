@@ -5,9 +5,9 @@
 Module to control Denon/Marantz
 """
 
-import asyncio
 import json
 from json import JSONDecodeError
+from asyncio import create_task, open_connection, StreamReader, StreamWriter, get_event_loop, Future
 from urllib.parse import parse_qs
 from logging import getLogger
 
@@ -16,6 +16,9 @@ from tentacruel.system import _HeosSystem
 from tentacruel.browse import _HeosBrowse
 from tentacruel.player import _HeosPlayer
 from tentacruel.group import _HeosGroup
+
+def create_future():
+    return get_event_loop().create_future()
 
 HEOS_PORT = 1255
 
@@ -28,18 +31,16 @@ FAVORITES = 1028
 #
 logger = getLogger(__name__)
 
-class HeosClientProtocol(asyncio.Protocol):
+class HeosClientProtocol():
     """
     Asynchronous protocol handler for Denon's Heos protocol for controlling home theatre receivers
     """
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, my_loop, start_action=None, halt=True):
-        self._loop = my_loop
-        self._start_action = start_action
-        self._buffer = ""
-        self._halt = halt
-
+    def __init__(self, host):
+        self._host = host
+        self._reader: StreamReader = None
+        self._writer: StreamWriter = None
         self.system = _HeosSystem(self)
         self.browse = _HeosBrowse(self)
         self.group = _HeosGroup(self)
@@ -50,7 +51,6 @@ class HeosClientProtocol(asyncio.Protocol):
         self._sequence = 1
         self._listeners = []
         self._progress_listeners = []
-        self.transport = None
         self._players = []
 
     def add_listener(self, listener):
@@ -59,40 +59,35 @@ class HeosClientProtocol(asyncio.Protocol):
     def add_progress_listener(self, listener):
         self._progress_listeners += [listener]
 
-    def connection_made(self, transport):
+    async def setup(self):
         """
-        Override method of Protocol called when connection is established.
+        Tasks we run as soon as the server is connected.  This includes turning on events,
+        listing available music sources,  etc.
 
-        :param transport:
+        In the immediate term I am working on a complete cycle of finding a piece of music
+        and playing it and I am doing that here because it is easy,  probably if we want
+        to separate this from the protocol,  this function can be implemented as a callback.
+
         :return:
         """
-        self.transport = transport
-        self._loop.create_task(self._setup())
+        (self._reader, self._writer) = await open_connection(self._host, HEOS_PORT)
+        create_task(self.receive_loop())
+        await self.system.register_for_change_events()
+        self._players = await _HeosPlayer(self).get_players()
+        for player in self._players:
+            self.players[player["name"]] = _HeosPlayer(self, player["pid"])
 
-    def data_received(self, data):
-        """
-        Override method of Protocol to handle incoming data.
-
-        Collects incoming data in buffer,  breaks that data up into JSON packets which are
-        delimited by '\r\n'.  Passes JSON packets into `_handle_response`
-
-        :param data: available bytes
-        :return:
-        """
-        self._buffer += data.decode()
+    async def receive_loop(self):
         while True:
-            try:
-                index = self._buffer.index("\r\n")
-            except ValueError:
-                return
-
-            packet = self._buffer[0:index]
-            self._buffer = self._buffer[index + 2:]
-            try:
-                jdata = json.loads(packet)
-                self._handle_response(jdata)
-            except JSONDecodeError:
-                logger.error("Error parsing %s  as json", jdata)
+            packet = await self._reader.readline()
+            if packet:
+                try:
+                    jdata = json.loads(packet)
+                    self._handle_response(jdata)
+                except JSONDecodeError:
+                    logger.error("Error parsing %s  as json", jdata)
+            else:
+                break
 
     # pylint: disable=too-many-branches
     def _handle_response(self, jdata):
@@ -183,32 +178,6 @@ class HeosClientProtocol(asyncio.Protocol):
         for listener in self._progress_listeners:
             listener(count)
 
-
-    def connection_lost(self, exc):
-        self._loop.stop()
-
-    async def _setup(self):
-        """
-        Tasks we run as soon as the server is connected.  This includes turning on events,
-        listing available music sources,  etc.
-
-        In the immediate term I am working on a complete cycle of finding a piece of music
-        and playing it and I am doing that here because it is easy,  probably if we want
-        to separate this from the protocol,  this function can be implemented as a callback.
-
-        :return:
-        """
-        await self.system.register_for_change_events()
-        self._players = await _HeosPlayer(self).get_players()
-        for player in self._players:
-            self.players[player["name"]] = _HeosPlayer(self, player["pid"])
-
-        if self._start_action:
-            await self._start_action(self)
-
-        if self._halt:
-            self._loop.stop()
-
     def get_players(self):
         return self._players
 
@@ -221,8 +190,8 @@ class HeosClientProtocol(asyncio.Protocol):
         raise KeyError(f"Couldn't find player with key {that}")
 
 
-    def _run_command(self, command: str, **arguments) -> asyncio.Future:
-        future = self._loop.create_future()
+    def _run_command(self, command: str, **arguments) -> Future:
+        future = create_future()
         this_event = self._sequence
         self._sequence += 1
 
@@ -246,6 +215,6 @@ class HeosClientProtocol(asyncio.Protocol):
 
         logger.debug("Sending command %s", url)
         cmd = url + "\r\n"
-        self.transport.write(cmd.encode("utf-8"))
+        self._writer.write(cmd.encode("utf-8"))
 
         return future

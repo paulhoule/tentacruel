@@ -3,9 +3,6 @@
 
 from asyncio import open_connection, get_event_loop, create_task
 
-#
-#
-#
 async def get_z2_status():
     reader, writer = await open_connection('192.168.0.10', 23)
 
@@ -15,7 +12,7 @@ async def get_z2_status():
             print(line)
 
     create_task(read_loop())
-    commands = [b"Z2ON"]
+    commands = [b"Z2OFF", b"SINET"]
     for command in commands:
         writer.write(command+b"\r")
 

@@ -11,7 +11,7 @@ from os import environ
 from pathlib import Path
 
 import yaml
-from tentacruel import HeosClientProtocol, _HeosPlayer, HEOS_PORT
+from tentacruel import HeosClientProtocol, _HeosPlayer
 from tentacruel.cli.control_lights import ControlLights
 from tentacruel.cli.lights import LightCommands
 from tentacruel.cli.drain_sqs import DrainSQS
@@ -68,7 +68,7 @@ class Application:
     def __init__(self, argv):
         self.argv = argv
         self.commands = Application.Commands(self)
-        self._heos = None
+        self._heos_client = None
 
     # pylint: disable=too-many-instance-attributes
     class Commands:
@@ -76,36 +76,21 @@ class Application:
             self.parent = parent
             self._player: _HeosPlayer = None
             self._lights = LightCommands(parent)
-            self._queue = DrainSQS(config)
             self._sensor_states = {}
             self._off_at = None
             self._prefixes = {"list"}
-
             self._hcp = None
 
-        # pylint: disable=protected-access
-        async def _heos(self):
-            if not self._hcp:
-                wait_on = asyncio.get_event_loop().create_future()
-                def client_factory():
-                    return HeosClientProtocol(
-                        asyncio.get_event_loop(),
-                        start_action=wait_on.set_result,
-                        halt=False
-                    )
-                await asyncio.get_event_loop().create_connection(
-                    client_factory,
-                    RECEIVER_IP, HEOS_PORT
-                )
-                self._hcp = await wait_on
-
-            return self._hcp
+        def _heos(self):
+            # pylint: disable=protected-access
+            return self.parent._heos_client
 
         async def light(self, parameters):
             await self._lights.do(parameters)
 
         async def drain_sqs(self, parameters):
-            await self._queue.do(parameters)
+            queue = DrainSQS(config)
+            await queue.do(parameters)
 
         async def control_lights(self, parameters):
             control = ControlLights(config, self._lights)
@@ -119,7 +104,7 @@ class Application:
             player_specification = parameters[0]
             pid = self._parse_player_specification(player_specification)
 
-            self._player = (await self._heos())[pid]
+            self._player = self._heos()[pid]
 
         # pylint: disable=no-self-use
         def _parse_player_specification(self, player_specification):
@@ -158,13 +143,14 @@ class Application:
                 await self._player.clear_queue()
 
                 for track in parameters:
+                    aid = _HeosPlayer.REPLACE_AND_PLAY
                     for entry in tracks:
                         if entry["key"] == track:
                             song = dict(entry)
                             del song["key"]
-                            await self._player.add_to_queue(aid=_HeosPlayer.ADD_TO_END, **song)
+                            await self._player.add_to_queue(aid=aid, **song)
                 await self._player.set_play_mode()
-                await self._player.set_play_state("play")
+#                await self._player.set_play_state("play")
 
 
         async def stop(self, parameters):
@@ -205,7 +191,7 @@ class Application:
             if parameters:
                 raise ValueError("The list groups command takes no arguments")
 
-            result = await (await self._heos()).group.get_groups()
+            result = await self._heos().group.get_groups()
             if not result:
                 print(f"The HEOS system has no groups.")
             idx = 1
@@ -222,24 +208,24 @@ class Application:
             if parameters:
                 raise ValueError("The clear_groups command takes no arguments")
 
-            result = await (await self._heos()).group.get_groups()
+            result = await self._heos().group.get_groups()
             for group in result:
                 leader = [
                     player["pid"]
                     for player in group["players"]
                     if player["role"] == "leader"
                 ]
-                await (await self._heos()).group.set_group(leader)
+                await self._heos().group.set_group(leader)
 
         async def group(self, parameters):
             if not parameters:
                 raise ValueError("You must specify multiple player names to create a group")
 
             if parameters == ['all']:
-                pid_list = [player.pid() for player in (await self._heos()).players.values()]
+                pid_list = [player.pid() for player in self._heos().players.values()]
             else:
                 pid_list = [self._parse_player_specification(x) for x in parameters]
-            await (await (await self._heos())).group.set_group(pid_list)
+            await self._heos().group.set_group(pid_list)
 
         # pylint: disable=too-many-branches
         async def wait(self, parameters):
@@ -335,6 +321,7 @@ class Application:
                     break
 
         async def enforce_lights(self, group, player, request_voice, thankyou_voice):
+            # pylint: disable=protected-access
             lights = self._lights._get_unreachable_lights(group)
             if not lights:
                 return True
@@ -383,8 +370,10 @@ class Application:
                 else:
                     url = None
 
-    async def run(self, that: HeosClientProtocol):
-        self._heos = that
+    async def run(self):
+        self._heos_client = HeosClientProtocol(config["server"]["ip"])
+        await self._heos_client.setup()
+
         if len(self.argv) == 1:
             self.help()
 
@@ -416,6 +405,6 @@ if __name__ == "__main__":
 #        RECEIVER_IP, HEOS_PORT
 #    )
 
-    loop.run_until_complete(application.run(None))
+    loop.run_until_complete(application.run())
     loop.run_forever()
     loop.close()
