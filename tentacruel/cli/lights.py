@@ -26,7 +26,11 @@ class LightCommands:
 
     def __init__(self, parent):
         self.parent = parent
-        self._bridge = Bridge()
+        self._bridge = None
+
+    def _ensure_bridge(self):
+        if not self._bridge:
+            self._bridge = Bridge()
 
     # pylint: disable=invalid-name
     async def do(self, parameters: List[str]):
@@ -44,6 +48,8 @@ class LightCommands:
         :param parameters:
         :return:
         """
+        self._ensure_bridge()
+
         idx = 0
         first = parameters[idx]
         idx += 1
@@ -75,6 +81,7 @@ class LightCommands:
                 raise ValueError(f"Command {cmd} is not available for lights")
 
     def _get_unreachable_lights(self, group_name):
+        self._ensure_bridge()
         that = self._bridge.get_group(group_name)
         not_available = set()
         for light in map(int, that['lights']):

@@ -154,8 +154,6 @@ class Application:
                             del song["key"]
                             await self._player.add_to_queue(aid=aid, **song)
                 await self._player.set_play_mode()
-#                await self._player.set_play_state("play")
-
 
         async def stop(self, parameters):
             if parameters:
@@ -404,5 +402,4 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     application = Application(sys.argv)
     loop.run_until_complete(application.run())
-    loop.run_forever()
     loop.close()
