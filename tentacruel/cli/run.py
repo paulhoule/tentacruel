@@ -333,9 +333,9 @@ class Application:
                 raise ValueError("defend command takes no parameters")
 
             light_zones = [
-                ("Bedroom", "Bedroom", "IvyTurnOnBedroom", "IvyThankYou"),
-                ("Hallway", "Room23", "UpstairsHallway", "JoeyThankYou"),
-                ("Bottom of Stairs", "Kitchen", "BrianDownstairs", "IvyThankYou")
+                ("Bedroom", "Bedroom", "TurnOnBedroom", "ThankYou"),
+                ("Hallway", "Room23", "TurnOnHallway", "ThankYou"),
+                ("Bottom of Stairs", "Kitchen", "TurnOnDownstairs", "ThankYou")
             ]
 
             for zone in light_zones:
@@ -349,14 +349,14 @@ class Application:
             if not lights:
                 return True
 
-            await self.player([player]) # Not the same bedroom\
-            await self.play(["Silence05", request_voice])
+            await self.player([player]) # Not the same bedroom
+            await self.play([request_voice])
 
             for _ in range(0, 200):
                 await asyncio.sleep(1)
                 lights = self._lights._get_unreachable_lights(group)
                 if not lights:
-                    await self.play(["Silence05", thankyou_voice])
+                    await self.play([thankyou_voice])
                     group_id = self._lights._bridge.get_group_id_by_name(group)
                     self._lights._bridge.set_group(group_id, "on", False)
                     return False
