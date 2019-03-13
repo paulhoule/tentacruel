@@ -6,14 +6,10 @@ from tkinter import Frame
 # see https://docs.arangodb.com/3.4/AQL/Functions/Document.html#keep
 from typing import Dict, Set
 
-
-def keep(source: Dict, keep_keys: Set):
-    return {key: value for (key, value) in source.items() if key in keep_keys}
-
-def discard(source: Dict, discard_keys: Set):
-    return {key: value for (key, value) in source.items() if key not in discard_keys}
-
 # pylint: disable=too-few-public-methods
+from tentacruel import keep, discard
+
+
 class STAR():
     pass
 

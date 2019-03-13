@@ -8,6 +8,7 @@ Module to control Denon/Marantz
 import json
 from json import JSONDecodeError
 from asyncio import create_task, open_connection, StreamReader, StreamWriter, get_event_loop, Future
+from typing import Dict, Set
 from urllib.parse import parse_qs
 from logging import getLogger
 
@@ -16,6 +17,12 @@ from tentacruel.system import _HeosSystem
 from tentacruel.browse import _HeosBrowse
 from tentacruel.player import _HeosPlayer
 from tentacruel.group import _HeosGroup
+
+def keep(source: Dict, keep_keys: Set):
+    return {key: value for (key, value) in source.items() if key in keep_keys}
+
+def discard(source: Dict, discard_keys: Set):
+    return {key: value for (key, value) in source.items() if key not in discard_keys}
 
 def create_future():
     return get_event_loop().create_future()

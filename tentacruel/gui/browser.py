@@ -3,7 +3,9 @@
 import asyncio
 import tkinter as tk
 from logging import getLogger
-from tentacruel.gui import ManagedGridFrame, keep, STAR
+
+from tentacruel import keep
+from tentacruel.gui import ManagedGridFrame, STAR
 
 logger = getLogger(__name__)
 HEADER = "header"

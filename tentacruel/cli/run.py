@@ -12,11 +12,10 @@ from pathlib import Path
 
 import yaml
 from arango import DocumentGetError
-from tentacruel import HeosClientProtocol, _HeosPlayer
+from tentacruel import HeosClientProtocol, _HeosPlayer, keep
 from tentacruel.cli.control_lights import ControlLights
 from tentacruel.cli.lights import LightCommands
 from tentacruel.cli.drain_sqs import DrainSQS
-from tentacruel.gui import keep
 
 logger = getLogger(__name__)
 if "LOGGING_LEVEL" in environ:
@@ -127,20 +126,6 @@ class Application:
                     " registered in the configuration file")
             return pid
 
-        # what is to be done...
-        #
-        # if I want to play an audio clip it doesn't work if the target in Room23
-        # (the AVR) if the AVR was in Bluetooth mode ore has recently been in
-        # Bluetooth mode.
-        #
-        # I think that the player can be kicked out of Bluetooth mode if we play a song
-        # with aid=4,  but just clearing the queue and doing the ADD_TO_END thing
-        # seems to leave it in Bluetooth mode.
-        #
-        # My hunch is that we can check the player to detect Bluetooth mode and then
-        # try the aid=4 trick or something similar.  Probably we can get away with
-        # playing a very short clip,  but I'd rather research this tomorrow.
-        #
         async def play(self, parameters):
             if not parameters:
                 await self._player.set_play_state("play")
