@@ -11,10 +11,12 @@ from os import environ
 from pathlib import Path
 
 import yaml
+from arango import DocumentGetError
 from tentacruel import HeosClientProtocol, _HeosPlayer
 from tentacruel.cli.control_lights import ControlLights
 from tentacruel.cli.lights import LightCommands
 from tentacruel.cli.drain_sqs import DrainSQS
+from tentacruel.gui import keep
 
 logger = getLogger(__name__)
 if "LOGGING_LEVEL" in environ:
@@ -27,7 +29,6 @@ with open(Path.home() / ".tentacruel" / "config.yaml") as a_stream:
 
 RECEIVER_IP = config["server"]["ip"]
 players = config["players"]
-tracks = config["tracks"]
 
 def separate_commands(arguments):
     commands = []
@@ -148,12 +149,29 @@ class Application:
 
                 for track in parameters:
                     aid = _HeosPlayer.REPLACE_AND_PLAY
-                    for entry in tracks:
-                        if entry["key"] == track:
-                            song = dict(entry)
-                            del song["key"]
-                            await self._player.add_to_queue(aid=aid, **song)
+                    song = await self._search_local_tracks(track)
+                    if not song:
+                        song = await self._search_network_tracks(track)
+                    if not song:
+                        raise ValueError(f"Could not find track named '{track}'")
+                    song = keep(song, {"cid", "sid", "mid"})
+                    await self._player.add_to_queue(aid=aid, **song)
+
                 await self._player.set_play_mode()
+
+        async def _search_local_tracks(self, track):
+            if "tracks" in config:
+                for entry in config["tracks"]:
+                    if entry["key"] == track:
+                        return dict(entry)
+
+        async def _search_network_tracks(self, track):
+            adb = self._connect_to_adb()
+            collection = adb.collection("tracks")
+            try:
+                return collection.get(track)
+            except DocumentGetError:
+                return None
 
         async def stop(self, parameters):
             if parameters:
@@ -347,6 +365,17 @@ class Application:
             from arango import ArangoClient
             client = ArangoClient(**config["arangodb"]["events"]["client"])
             return client.db(**config["arangodb"]["events"]["database"])
+
+        async def load_tracks(self, parameters):
+            if parameters:
+                raise ValueError("load_tracks takes no parameters")
+
+            adb = self._connect_to_adb()
+            collection = adb.collection("tracks")
+            for track in config["tracks"]:
+                track["_key"] = track["key"]
+                del track["key"]
+                collection.insert(track)
 
         async def read_smartthings_configuration(self, parameters):
             if parameters:
