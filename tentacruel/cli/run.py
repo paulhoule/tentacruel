@@ -96,7 +96,7 @@ class Application:
             await queue.do(parameters)
 
         async def control_lights(self, parameters):
-            control = ControlLights(config, self._lights)
+            control = ControlLights(config)
             await control.do(parameters)
 
         async def player(self, parameters):

@@ -12,37 +12,14 @@ class LightZone:
     VERTICAL = "vertical"
     INDEPENDENT = "independent"
 
-    def __init__(self, effector, timeouts=None):
+    def __init__(self, effector, config):
         self.effector = effector
         self.major = LightZone.INDEPENDENT
-        self.light_zones = {
-            'downstairs-hallway': 'bottom',
-            'upstairs-north': 'top',
-            'upstairs-south': 'top'
-        }
-
-        self.sensor_zones = {
-            "upstairs-south": 'top',
-            "upstairs-north": 'top',
-            "upstairs-mid": 'top',
-            "downstairs-hallway": 'bottom'
-        }
-
-        self._hue_targets = {
-            "upstairs-north": 2,
-            "upstairs-south": 3,
-            "downstairs-hallway": 6
-        }
-
-        self.sensors = {
-            "a76876ab-6ded-4fb5-9955-76dd0cbb6525": "upstairs-south",
-            "c9d2e33e-258b-48c5-af1a-29a95f189d80": "upstairs-north",
-            "bf423230-3495-4375-8033-60b4f7d3455c": "upstairs-mid",
-            "a20bab2e-a7d0-4c93-8723-27a7bf3299b6": "downstairs-hallway"
-        }
-
-        self.timeouts = timeouts
-
+        self.light_zones = config["light_assignments"]
+        self.sensor_zones = config["sensor_assignments"]
+        self.lights = config["lights"]
+        self.sensors = config["sensors"]
+        self.timeouts = config["timeouts"]
         self.alarms = {
             "bottom": None,
             "top": None,
@@ -69,7 +46,7 @@ class LightZone:
             zone = self.sensor_zones[sensor]
             for light, light_zone in self.light_zones.items():
                 if light_zone == zone:
-                    light_id = self._hue_targets[light]
+                    light_id = self.lights[light]
                     commands.append(('l', light_id, 'on', True))
 
             self.effector(commands)
@@ -88,7 +65,7 @@ class LightZone:
             if alarm and  when >= alarm:
                 for light, light_zone in self.light_zones.items():
                     if light_zone == zone:
-                        light_id = self._hue_targets[light]
+                        light_id = self.lights[light]
                         commands.append(('l', light_id, 'on', False))
                 self.alarms[zone] = None
 

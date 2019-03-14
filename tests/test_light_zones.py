@@ -1,7 +1,9 @@
 import asyncio
 from asyncio import get_event_loop
+from pathlib import Path
 from unittest.mock import MagicMock
 
+import yaml
 from tentacruel.cli import LightZone
 
 def test_independent_mode():
@@ -10,11 +12,11 @@ def test_independent_mode():
 async def _test_independent_mode():
     now = 0
     effector = MagicMock()
-    timeouts = {
-        "bottom": 200,
-        "top": 500,
-    }
-    zone = LightZone(effector,timeouts=timeouts)
+    there = Path(__file__).parent / "independent_config.yaml"
+    with open(there) as from_there:
+        zone_config = yaml.load(from_there)
+
+    zone = LightZone(effector, zone_config)
     await zone.on_event({
         "deviceId": "a76876ab-6ded-4fb5-9955-76dd0cbb6525",
         "attribute": "moe",

@@ -121,7 +121,7 @@ class GeneralBrowser(ManagedGridFrame):
                 original_start = int(message["range"].split(",")[0])
             start = original_start + returned
             end = start + returned
-            query["range"] = f"{start},{end}"
+            query["_range"] = f"{start},{end}"
 
         if count == self._item_idx:
             if count == len(self._item_ids):

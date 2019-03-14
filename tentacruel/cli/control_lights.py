@@ -7,6 +7,7 @@ from asyncio import get_event_loop, sleep, gather
 from logging import getLogger
 
 from aio_pika import connect_robust, ExchangeType
+from phue import Bridge
 from tentacruel.cli import LightZone
 
 logger = getLogger(__name__)
@@ -16,17 +17,18 @@ class ControlLights:
     Implementation of Command Line command to drain events from rabbitmq and have
     appropriate side effects on the lights!
     """
-    def __init__(self, config, lights):
+    def __init__(self, config):
         self._prefixes = {}
         self.config = config
         # pylint: disable=protected-access
-        self.bridge = lights._bridge
+        self.bridge = Bridge()
 
         self.zones = [
             LightZone(
                 self.send_to_hue,
-                timeouts={"bottom": 60, "top": 120}
+                zone
             )
+            for zone in config["zones"]
         ]
 
     async def do(self, parameters):
