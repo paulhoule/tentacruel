@@ -21,9 +21,12 @@ class LightZone:
         self.sensors = config["sensors"]
         self.timeouts = config["timeouts"]
         self.alarms = {
-            "bottom": None,
-            "top": None,
+            key : None
+            for key in self.timeouts
         }
+
+        self.states = config.get("states", ["singleton"])
+        self.state = None
 
     async def setup(self):
         """
@@ -35,7 +38,7 @@ class LightZone:
             ("l", light, 'on', False) for light in self.lights.values()
         ]
         self.effector(commands)
-
+        self.state = self.states[0]
 
     async def on_event(self, event, when):
         """
@@ -51,15 +54,32 @@ class LightZone:
             return
 
         sensor = self.sensors[device_id]
-        state = event["value"]
+        value = event["value"]
 
-        if state == "active":
-            commands = []
+        if value == "active":
             zone = self.sensor_zones[sensor]
-            for light, light_zone in self.light_zones.items():
-                if light_zone == zone:
+            off_zones = set()
+            commands = []
+            if self.state == "dark" and zone == "bottom":
+                zone = "vertical"
+                self.state = "vertical"
+                self.alarms["vertical"] = when + self.timeouts["vertical"]
+            elif self.state == "vertical" and zone == "top":
+                zone = "top"
+                off_zones = {"bottom"}
+                self.alarms["vertical"] = None
+                self.state = "independent"
+            else:
+                self.state = "independent"
+
+            for light in self.light_zones[zone]:
+                light_id = self.lights[light]
+                commands.append(('l', light_id, 'on', True))
+
+            for off_zone in off_zones:
+                for light in self.light_zones[off_zone]:
                     light_id = self.lights[light]
-                    commands.append(('l', light_id, 'on', True))
+                    commands.append(('l', light_id, 'on', False))
 
             self.effector(commands)
         else:
@@ -69,17 +89,28 @@ class LightZone:
     async def on_tick(self, when):
         """
 
-        :param when:
+        :param when: timestamp in seconds counting upwards.  This could be the Unix epoch or
+                     it could be a countup local to a thread
         :return:
         """
         commands = []
         for zone, alarm in self.alarms.items():
             if alarm and  when >= alarm:
-                for light, light_zone in self.light_zones.items():
-                    if light_zone == zone:
+                if zone == "vertical":
+                    self.state = "independent"
+                    bottom = set(self.light_zones["bottom"])
+                    vertical = set(self.light_zones["vertical"])
+                    for light in vertical - bottom:
+                        light_id = self.lights[light]
+                        commands.append(('l', light_id, 'on', False))
+                else:
+                    for light in self.light_zones[zone]:
                         light_id = self.lights[light]
                         commands.append(('l', light_id, 'on', False))
                 self.alarms[zone] = None
+
+        if all([not then for then in self.alarms.values()]):
+            self.state = "dark"
 
         if commands:
             self.effector(commands)
