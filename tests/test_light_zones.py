@@ -17,6 +17,16 @@ async def _test_independent_mode():
         zone_config = yaml.load(from_there)
 
     zone = LightZone(effector, zone_config)
+    await zone.setup()
+    effector.assert_called_once()
+    commands = effector.call_args[0][0]
+    assert(len(commands) == 3)
+    assert({x[0] for x in commands} == {'l'})
+    assert({x[1] for x in commands} == {2,3,6})
+    assert({x[2] for x in commands} == {'on'})
+    assert({x[3] for x in commands} == {False})
+    effector.reset_mock()
+
     await zone.on_event({
         "deviceId": "a76876ab-6ded-4fb5-9955-76dd0cbb6525",
         "attribute": "moe",

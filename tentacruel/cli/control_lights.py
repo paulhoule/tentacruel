@@ -46,6 +46,10 @@ class ControlLights:
             loop=get_event_loop(),
             **self.config["pika"]
         )
+
+        for zone in self.zones:
+            await zone.setup()
+
         async with connection:
             channel = await connection.channel()
 
@@ -97,7 +101,6 @@ class ControlLights:
             await sleep(10)
             for zone in self.zones:
                 await zone.on_tick(get_event_loop().time())
-
 
     def send_to_hue(self, commands):
         """

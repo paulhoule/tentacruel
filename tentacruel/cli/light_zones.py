@@ -25,6 +25,18 @@ class LightZone:
             "top": None,
         }
 
+    async def setup(self):
+        """
+        Turn off all the lights at the very beginning.
+
+        :return:
+        """
+        commands = [
+            ("l", light, 'on', False) for light in self.lights.values()
+        ]
+        self.effector(commands)
+
+
     async def on_event(self, event, when):
         """
 
