@@ -1,4 +1,10 @@
 # pylint: disable=missing-docstring
+# pylint: disable=missing-docstring
+
+from logging import getLogger, DEBUG
+
+LOGGER = getLogger()
+
 # pylint: disable=too-many-instance-attributes
 class LightZone:
     """
@@ -14,7 +20,6 @@ class LightZone:
 
     def __init__(self, effector, config):
         self.effector = effector
-        self.major = LightZone.INDEPENDENT
         self.light_zones = config["light_assignments"]
         self.sensor_zones = config["sensor_assignments"]
         self.lights = config["lights"]
@@ -27,6 +32,25 @@ class LightZone:
 
         self.states = config.get("states", ["singleton"])
         self.state = None
+        self.event_count = 0
+        self.shadow = {}
+
+    async def set_state(self, new_state):
+        LOGGER.debug(
+            "Event %d: transition from %s to %s",
+            self.event_count,
+            self.state,
+            new_state)
+        self.state = new_state
+
+    async def set_alarm_for(self, system, when=None):
+        self.alarms[system] = when
+        LOGGER.debug("Event %d: set alarm %s for %s ", self.event_count, system, when)
+        if LOGGER.isEnabledFor(DEBUG):
+            for key, value in self.alarms.items():
+                if value:
+                    LOGGER.debug("Event %d: alarm for %s at %s", self.event_count, key, value)
+
 
     async def setup(self):
         """
@@ -39,6 +63,9 @@ class LightZone:
         ]
         self.effector(commands)
         self.state = self.states[0]
+        self.shadow = {
+            light: False for light in self.lights.keys()
+        }
 
     async def on_event(self, event, when):
         """
@@ -49,6 +76,7 @@ class LightZone:
         if event["attribute"] != "motion":
             return
 
+        self.event_count += 1
         device_id = event["deviceId"]
         if device_id not in self.sensors:
             return
@@ -62,29 +90,34 @@ class LightZone:
             commands = []
             if self.state == "dark" and zone == "bottom":
                 zone = "vertical"
-                self.state = "vertical"
-                self.alarms["vertical"] = when + self.timeouts["vertical"]
+                await self.set_state("vertical")
+                await self.set_alarm_for("vertical", when + self.timeouts["vertical"])
             elif self.state == "vertical" and zone == "top":
                 zone = "top"
                 off_zones = {"bottom"}
-                self.alarms["vertical"] = None
-                self.state = "independent"
+                await self.set_alarm_for("vertical")
+                await self.set_state("independent")
             else:
-                self.state = "independent"
+                await self.set_state("independent")
 
             for light in self.light_zones[zone]:
                 light_id = self.lights[light]
+                self.shadow[light] = True
                 commands.append(('l', light_id, 'on', True))
 
             for off_zone in off_zones:
                 for light in self.light_zones[off_zone]:
                     light_id = self.lights[light]
+                    self.shadow[light] = False
                     commands.append(('l', light_id, 'on', False))
 
             self.effector(commands)
         else:
             zone = self.sensor_zones[sensor]
-            self.alarms[zone] = when + self.timeouts[zone]
+            if self.state == "vertical" and zone == "bottom":
+                zone = "vertical"
+
+            await self.set_alarm_for(zone, when + self.timeouts[zone])
 
     async def on_tick(self, when):
         """
@@ -93,24 +126,28 @@ class LightZone:
                      it could be a countup local to a thread
         :return:
         """
+        self.event_count += 1
         commands = []
         for zone, alarm in self.alarms.items():
             if alarm and  when >= alarm:
                 if zone == "vertical":
-                    self.state = "independent"
+                    await self.set_state("independent")
                     bottom = set(self.light_zones["bottom"])
                     vertical = set(self.light_zones["vertical"])
                     for light in vertical - bottom:
                         light_id = self.lights[light]
+                        self.shadow[light] = False
                         commands.append(('l', light_id, 'on', False))
                 else:
                     for light in self.light_zones[zone]:
                         light_id = self.lights[light]
+                        self.shadow[light] = False
                         commands.append(('l', light_id, 'on', False))
-                self.alarms[zone] = None
+                await self.set_alarm_for(zone)
 
-        if all([not then for then in self.alarms.values()]):
-            self.state = "dark"
+        if "dark" in self.states and self.state != 'dark':
+            if all([not on_state for on_state in self.shadow.values()]):
+                await self.set_state("dark")
 
         if commands:
             self.effector(commands)
