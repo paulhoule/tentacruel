@@ -317,13 +317,12 @@ class Application:
             if parameters:
                 raise ValueError("defend command takes no parameters")
 
-            light_zones = [
-                ("Bedroom", "Bedroom", "TurnOnBedroom", "ThankYou"),
-                ("Hallway", "Room23", "TurnOnHallway", "ThankYou"),
-                ("Bottom of Stairs", "Kitchen", "TurnOnDownstairs", "ThankYou")
-            ]
+            #
+            # it is tempting to align this list to the zones used for turning lights
+            # on and off with motion,  but one of these zones is not motion controlled!
+            #
 
-            for zone in light_zones:
+            for zone in config["light_defend_zones"]:
                 lights_ok = await self.enforce_lights(*zone)
                 if not lights_ok:
                     break
