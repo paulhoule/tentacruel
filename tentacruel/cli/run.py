@@ -317,32 +317,35 @@ class Application:
             if parameters:
                 raise ValueError("defend command takes no parameters")
 
-            #
-            # it is tempting to align this list to the zones used for turning lights
-            # on and off with motion,  but one of these zones is not motion controlled!
-            #
-
-            for zone in config["light_defend_zones"]:
-                lights_ok = await self.enforce_lights(*zone)
+            for zone in config["zones"]:
+                lights_ok = await self.enforce_lights(zone)
                 if not lights_ok:
                     break
 
-        async def enforce_lights(self, group, player, request_voice, thankyou_voice):
+        async def enforce_lights(self, zone):
+            if not "defend" in zone:
+                return True
+
+            all_lights = [light for light in zone["lights"].values()]
             # pylint: disable=protected-access
-            lights = self._lights._get_unreachable_lights(group)
+            lights = self._lights._get_unreachable_lights(all_lights)
             if not lights:
                 return True
+
+            player = zone["defend"]["speaker"]
+            request_voice = zone["defend"]["request"]
+            thankyou_voice = zone["defend"].get("thankyou", "ThankYou")
 
             await self.player([player]) # Not the same bedroom
             await self.play([request_voice])
 
             for _ in range(0, 200):
                 await asyncio.sleep(1)
-                lights = self._lights._get_unreachable_lights(group)
+                lights = self._lights._get_unreachable_lights(all_lights)
                 if not lights:
                     await self.play([thankyou_voice])
-                    group_id = self._lights._bridge.get_group_id_by_name(group)
-                    self._lights._bridge.set_group(group_id, "on", False)
+                    for light in all_lights:
+                        self._lights._bridge.set_light(light, "on", False)
                     return False
 
         def _connect_to_adb(self):

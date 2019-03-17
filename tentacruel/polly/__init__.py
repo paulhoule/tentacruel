@@ -34,8 +34,8 @@ clips = [
     ("thank-you", "Thank You"),
     ("bedroom-on", "Would you please turn on the leftmost light switch in the bedroom?"),
     ("hallway-on", "Excuse me.  Would you please toggle the lights in the stairwell?"),
-    ("downstairs-on", "Excuse me.  Would you please pull the chain "
-                      "on the light at the bottom of the stairs?")
+    ("downstairs-on", "Excuse me.  Would you please pull the chain on the light "
+                      "in the downstairs bathroom?")
 ]
 
 target = Path(r"E:\voices")
@@ -44,6 +44,7 @@ def speak(text_name, text, voice="Ivy"):
     ssml += f"<break time='0.9s' />"
     ssml += "<amazon:breath duration='x-long' volume='x-loud' />"
     ssml += text
+    ssml += f"<break time='0.9s' />"
     ssml += "</speak>"
     print(ssml)
 

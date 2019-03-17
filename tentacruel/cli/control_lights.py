@@ -28,7 +28,7 @@ class ControlLights:
                 self.send_to_hue,
                 zone
             )
-            for zone in config["zones"]
+            for zone in config["zones"] if "sensors" in zone
         ]
 
     async def do(self, parameters):

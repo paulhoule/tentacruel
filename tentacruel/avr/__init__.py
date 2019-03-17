@@ -12,7 +12,7 @@ async def get_z2_status():
             print(line)
 
     create_task(read_loop())
-    commands = [b"Z2OFF", b"SINET"]
+    commands = [b"Z2ON", b"SINET"]
     # commands = [b"Z2ON", b"SINET"]
     for command in commands:
         writer.write(command+b"\r")

@@ -80,11 +80,10 @@ class LightCommands:
             else:
                 raise ValueError(f"Command {cmd} is not available for lights")
 
-    def _get_unreachable_lights(self, group_name):
+    def _get_unreachable_lights(self, lights):
         self._ensure_bridge()
-        that = self._bridge.get_group(group_name)
         not_available = set()
-        for light in map(int, that['lights']):
+        for light in map(int, lights):
             if not self._bridge.get_light(light)['state']['reachable']:
                 not_available.add(light)
         return not_available
