@@ -6,7 +6,7 @@ Routine that uses ping for presence detection in the LAN
 import platform    # For getting the operating system name
 import subprocess  # For executing a shell command
 import sys
-from asyncio import run, WindowsProactorEventLoopPolicy, set_event_loop_policy
+from asyncio import run, set_event_loop_policy
 from asyncio.subprocess import PIPE, STDOUT, create_subprocess_exec
 from logging import getLogger, StreamHandler
 from os import environ
@@ -87,6 +87,7 @@ def ensure_proactor():
     :return: None
     """
     if sys.platform == 'win32':
+        from asyncio import WindowsProactorEventLoopPolicy
         set_event_loop_policy(WindowsProactorEventLoopPolicy())
 
 
