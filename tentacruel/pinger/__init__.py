@@ -71,11 +71,35 @@ async def ping_all():
            FILTER NOT row.disabled
            return row._key
     """)
-    targets = [key for key in cursor]
+    targets = {key for key in cursor}
+    retry_count = 3
+    seen = await ping_targets(retry_count, targets)
+    updates = [
+        {"_key": key, "visible": value}
+        for (key, value) in seen.items()
+    ]
+    adb.collection("pingables").update_many(updates)
+
+async def ping_targets(retry_count, targets):
+    """
+    Ping targets with up to ``retry_count`` attempts.
+
+    :param retry_count: number of attempts made to contact host
+    :param targets: iterable of strings,  ip addresses of targets
+    :return:
+    """
+    unseen_targets = set(targets)
+    for _ in range(retry_count):
+        for target in list(unseen_targets):
+            logger.debug("Pinging %s", target)
+            responded = await ping(target)
+            if responded:
+                unseen_targets.remove(target)
+            print(f"{target} {responded}")
+    seen = {}
     for target in targets:
-        logger.debug("Pinging %s", target)
-        responded = await ping(target)
-        print(f"{target} {responded}")
+        seen[target] = target not in unseen_targets
+    return seen
 
 
 def ensure_proactor():
