@@ -22,4 +22,4 @@ def ping(host):
     if result.returncode:
         return False
 
-    return result.stdout.find(b"Destination host unreachable.") == -1
+    return result.stdout.find(b"unreachable.") == -1
