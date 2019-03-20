@@ -7,7 +7,7 @@ import json
 import platform    # For getting the operating system name
 import subprocess  # For executing a shell command
 import sys
-from asyncio import run, set_event_loop_policy, get_event_loop
+from asyncio import run, set_event_loop_policy, get_event_loop, sleep
 from asyncio.subprocess import PIPE, STDOUT, create_subprocess_exec
 from logging import getLogger, StreamHandler
 from os import environ
@@ -90,42 +90,50 @@ class Pinger:
 
     async def ping_all(self):
         """
-        Ping every host on our list
+        Ping every host on our list over and over again
 
-        :return:
+        :return: None
         """
         await self.setup()
         async with self.connection:
-            exchange = await self.connect_to_exchange()
-            cursor = self.adb.aql.execute("""
+            while True:
+                await self.ping_all_once()
+                await sleep(60)
+
+    async def ping_all_once(self):
+        """
+        Ping all hosts once
+
+        :return: None
+        """
+        exchange = await self.connect_to_exchange()
+        cursor = self.adb.aql.execute("""
                 FOR row in pingables
                    FILTER NOT row.disabled
                    return [row._key,row.visible]
             """)
+        targets = dict(cursor)
+        seen = await ping_targets(self.retry_count, targets.keys())
+        update_adb = []
+        events = []
+        for host, visible in seen.items():
+            this_moment = iso_zulu_now()
+            delta = {
+                "_key": host,
+                "visible": visible,
+                "lastObservedTime": this_moment,
+            }
+            if visible != targets[host]:
+                delta["lastChangedTime"] = this_moment
 
-            targets = dict(cursor)
-            seen = await ping_targets(self.retry_count, targets.keys())
-            update_adb = []
-            events = []
-            for host, visible in seen.items():
-                this_moment = iso_zulu_now()
-                delta = {
-                    "_key": host,
-                    "visible": visible,
-                    "lastObservedTime": this_moment,
-                }
-                if visible != targets[host]:
-                    delta["lastChangedTime"] = this_moment
+                event = await self.create_event_packet(host, this_moment, visible)
+                events.append(event)
 
-                    event = await self.create_event_packet(host, this_moment, visible)
-                    events.append(event)
-
-                update_adb.append(delta)
-
-            self.adb.collection("pingables").update_many(update_adb)
-            for event in events:
-                message = Message(body=json.dumps(event).encode("ascii"))
-                await exchange.publish(message, routing_key=event["attribute"])
+            update_adb.append(delta)
+        self.adb.collection("pingables").update_many(update_adb)
+        for event in events:
+            message = Message(body=json.dumps(event).encode("ascii"))
+            await exchange.publish(message, routing_key=event["attribute"])
 
     async def connect_to_exchange(self):
         """
