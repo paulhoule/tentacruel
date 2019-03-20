@@ -25,7 +25,6 @@ class DrainSQS:
         self.sqs = self._connect_to_sqs()
         adb = self._connect_to_adb()
         self.collection = adb.collection("sqs_events")
-        self.aqmp = None
 
     def _connect_to_adb(self):
         from arango import ArangoClient
