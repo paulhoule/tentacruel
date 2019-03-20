@@ -23,13 +23,6 @@ class DrainSQS:
         self._prefixes = {}
         self.config = config
         self.sqs = self._connect_to_sqs()
-        adb = self._connect_to_adb()
-        self.collection = adb.collection("sqs_events")
-
-    def _connect_to_adb(self):
-        from arango import ArangoClient
-        client = ArangoClient(**self.config["arangodb"]["events"]["client"])
-        return client.db(**self.config["arangodb"]["events"]["database"])
 
     def _connect_to_sqs(self):
         from boto3 import client
@@ -101,8 +94,6 @@ class DrainSQS:
                     del device_event["eventId"]
                     event_batch.append(device_event)
 
-            logger.debug("Inserting messages into arangodb")
-            self.collection.insert_many(event_batch)
             logger.debug("Inserting messages into rabbitmq")
             for event in event_batch:
                 message = Message(body=json.dumps(event).encode("ascii"))
