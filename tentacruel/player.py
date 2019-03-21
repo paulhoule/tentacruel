@@ -220,7 +220,7 @@ class _HeosPlayer(_HeosService):
     async def play_stream(self, sid, cid, mid, name):
         return await self._run(
             "play_stream",
-            id=sid,
+            sid=sid,
             cid=cid,
             mid=mid,
             pid=self._pid,
