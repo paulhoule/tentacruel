@@ -12,8 +12,8 @@ Structure of collection:
          blue:
             expires: 2019-08-01T15:25:11Z
 
-Note that the key is a UUID which would be a deviceId if the thing that has a mode is device,  otherwise
-it would be a locationId or a zoneId,  or a personId or whatever.
+Note that the key is a UUID which would be a deviceId if the thing that has a mode is device,
+otherwise it would be a locationId or a zoneId,  or a personId or whatever.
 
 The stack and the modes are separated because I believe the queries would be simple and natural to
 handle both changes to the stack (push and pop) as well as updates to the expiration date in an
@@ -25,12 +25,10 @@ gets tempting to let modes nest (eg. two kinds of "blue")
 
 """
 
-from pathlib import Path
-
-import yaml
-from tentacruel.leases import get_config, connect_to_adb
+from tentacruel.config import connect_to_adb, get_config
 
 if __name__ == "__main__":
+    # pylint: disable=invalid-name
     config = get_config()
     adb = connect_to_adb(config)
     print(type(adb))
