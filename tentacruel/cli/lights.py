@@ -4,6 +4,7 @@ a sane way to add or remove new commands that we can firm up over time.
 """
 
 import re
+from asyncio import sleep
 from typing import List
 from phue import Bridge
 
@@ -26,11 +27,11 @@ class LightCommands:
 
     def __init__(self, parent):
         self.parent = parent
-        self._bridge = None
+        self.bridge = None
 
     def _ensure_bridge(self):
-        if not self._bridge:
-            self._bridge = Bridge()
+        if not self.bridge:
+            self.bridge = Bridge()
 
     # pylint: disable=invalid-name
     async def do(self, parameters: List[str]):
@@ -56,12 +57,12 @@ class LightCommands:
         pattern = re.compile("[0-9]+")
         if pattern.match(first):
             light_id = int(first)
-            light = self._bridge.lights[light_id - 1]
+            light = self.bridge.lights[light_id - 1]
         elif first == "group":
             second = parameters[idx]
             idx += 1
             group_id = int(second)
-            light = self._bridge.groups[group_id - 1]
+            light = self.bridge.groups[group_id - 1]
         else:
             raise ValueError("the light command must be followed by "
                              "a number or by 'group' and then a number")
@@ -80,10 +81,32 @@ class LightCommands:
             else:
                 raise ValueError(f"Command {cmd} is not available for lights")
 
-    def _get_unreachable_lights(self, lights):
+    async def get_unreachable_lights(self, lights, wait_time=10, tries=3):
+        """
+        Detect unavailable lights.  Every so often a ping fails (for instance when there
+        is a lot of Wi-Fi activity) so we will wait and retry to make sure.  Default
+        settings are based on a small amount of experience with how rapidly the Hue
+        system seems to respond to lights having the AC power turned on and off
+
+        :param lights: list or set of integer light ids
+        :param wait_time: how many seconds to wait to try pinging lights a second time
+        :param tries: how many tries to try the ping before giving up
+        :return: set of unavailable lights
+        """
+
         self._ensure_bridge()
-        not_available = set()
-        for light in map(int, lights):
-            if not self._bridge.get_light(light)['state']['reachable']:
-                not_available.add(light)
-        return not_available
+        available = set()
+        lights = set(map(int, lights))
+        for attempt in range(tries):
+            unavailable = lights - available
+            if not unavailable:
+                return set()
+
+            if attempt:
+                await sleep(wait_time)
+
+            for light in lights - available:
+                if self.bridge.get_light(light)['state']['reachable']:
+                    available.add(light)
+
+        return lights - available

@@ -1,21 +1,19 @@
 # pylint: disable=missing-docstring
 # pylint: disable=invalid-name
 
-import asyncio
 import datetime
 import json
 import re
 import sys
+from asyncio import sleep, get_event_loop
 from logging import getLogger, StreamHandler
 from os import environ
-from pathlib import Path
-
-import yaml
 from arango import DocumentGetError
 from tentacruel import HeosClientProtocol, _HeosPlayer, keep
 from tentacruel.cli.control_lights import ControlLights
 from tentacruel.cli.lights import LightCommands
 from tentacruel.cli.drain_sqs import DrainSQS
+from tentacruel.config import get_config
 
 logger = getLogger(__name__)
 if "LOGGING_LEVEL" in environ:
@@ -23,8 +21,7 @@ if "LOGGING_LEVEL" in environ:
 
 getLogger(None).addHandler(StreamHandler())
 
-with open(Path.home() / ".tentacruel" / "config.yaml") as a_stream:
-    config = yaml.load(a_stream)
+config = get_config()
 
 RECEIVER_IP = config["server"]["ip"]
 players = config["players"]
@@ -268,7 +265,7 @@ class Application:
                     import dateutil.tz
                     delay = (event - datetime.datetime.now(tz=dateutil.tz.gettz())).total_seconds()
                     logger.debug("Waiting for %d seconds", delay)
-                    return await asyncio.sleep(delay)
+                    return await sleep(delay)
 
                 if len(parameters) == 1:
                     raise ValueError("You must specify a time to wait until")
@@ -288,7 +285,7 @@ class Application:
                     target_time = datetime.datetime.combine(current_date, that_time)
                     delay = (target_time - now).total_seconds()
                     logger.debug("Waiting for %d seconds", delay)
-                    return await asyncio.sleep(delay)
+                    return await sleep(delay)
 
             if re.match(r"\d+", parameters[0]):
                 duration = int(parameters[0])
@@ -298,7 +295,7 @@ class Application:
                 if len(parameters) == 2:
                     duration = self._convert_to_seconds(duration, parameters[1])
 
-                return await asyncio.sleep(duration)
+                return await sleep(duration)
 
             raise ValueError("You must specify a numeric amount of time to wait")
 
@@ -327,25 +324,39 @@ class Application:
                 return True
 
             all_lights = [light for light in zone["lights"].values()]
-            # pylint: disable=protected-access
-            lights = self._lights._get_unreachable_lights(all_lights)
+            lights = await self._lights.get_unreachable_lights(all_lights)
             if not lights:
+                logger.debug("defend system found no lights unavailable in zone %s", zone['key'])
                 return True
+
+            for light in lights:
+                logger.debug("light %d not available in zone %s", light, zone['key'])
 
             player = zone["defend"]["speaker"]
             request_voice = zone["defend"]["request"]
             thankyou_voice = zone["defend"].get("thankyou", "ThankYou")
 
-            await self.player([player]) # Not the same bedroom
+            logger.debug("playing message %s on player %s", request_voice, player)
+            await self.player([player])
             await self.play([request_voice])
 
-            for _ in range(0, 200):
-                await asyncio.sleep(1)
-                lights = self._lights._get_unreachable_lights(all_lights)
+            #
+            # fairly arbitrary timeout (200 seconds) to look for bulbs
+            #
+
+            for attempt in range(0, 40):
+                await sleep(5)
+                lights = await self._lights.get_unreachable_lights(all_lights, tries=1)
+                for light in lights:
+                    logger.debug("attempt %d to find light %d failed", attempt, light)
+
                 if not lights:
+                    logger.debug("lights came back!")
+                    logger.debug("playing message %s on player %s", thankyou_voice, player)
                     await self.play([thankyou_voice])
+                    await sleep(5)
                     for light in all_lights:
-                        self._lights._bridge.set_light(light, "on", False)
+                        self._lights.bridge.set_light(light, "on", False)
                     return False
 
         def _connect_to_adb(self):
@@ -415,7 +426,7 @@ class Application:
         help(self.help)
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
+    loop = get_event_loop()
     application = Application(sys.argv)
     loop.run_until_complete(application.run())
     loop.close()
