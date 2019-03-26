@@ -99,7 +99,7 @@ def only(facts):
 
 async def avr_status():
     # pylint: disable=too-many-locals
-    # pylint: dsiable=too-many-branches
+    # pylint: disable=too-many-branches
     # pylint: disable=too-many-statements
     host = '192.168.0.10'
     heos = HeosClientProtocol(host)

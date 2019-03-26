@@ -7,7 +7,8 @@ Module to control Denon/Marantz
 
 import json
 from json import JSONDecodeError
-from asyncio import create_task, open_connection, StreamReader, StreamWriter, get_event_loop, Future, CancelledError
+from asyncio import create_task, open_connection, StreamReader, StreamWriter
+from asyncio import get_event_loop, Future, CancelledError
 from typing import Dict, Set
 from urllib.parse import parse_qs
 from logging import getLogger
