@@ -7,7 +7,7 @@ Module to control Denon/Marantz
 
 import json
 from json import JSONDecodeError
-from asyncio import create_task, open_connection, StreamReader, StreamWriter, get_event_loop, Future
+from asyncio import create_task, open_connection, StreamReader, StreamWriter, get_event_loop, Future, CancelledError
 from typing import Dict, Set
 from urllib.parse import parse_qs
 from logging import getLogger
@@ -59,6 +59,7 @@ class HeosClientProtocol():
         self._listeners = []
         self._progress_listeners = []
         self._players = []
+        self._tasks = []
 
     def add_listener(self, listener):
         self._listeners += [listener]
@@ -78,11 +79,21 @@ class HeosClientProtocol():
         :return:
         """
         (self._reader, self._writer) = await open_connection(self._host, HEOS_PORT)
-        create_task(self.receive_loop())
+        self._tasks.append(create_task(self.receive_loop()))
         await self.system.register_for_change_events()
         self._players = await _HeosPlayer(self).get_players()
         for player in self._players:
             self.players[player["name"]] = _HeosPlayer(self, player["pid"])
+
+    async def shutdown(self):
+        for task in self._tasks:
+            task.cancel()
+
+        for task in self._tasks:
+            try:
+                await task
+            except CancelledError:
+                pass
 
     async def receive_loop(self):
         while True:

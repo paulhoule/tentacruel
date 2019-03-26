@@ -17,6 +17,7 @@ python-arango = "^4.4"
 pytz = "^2018.9"
 aio-pika = "^5.3"
 mutagen = "^1.42"
+multidict = "^4.5"
 [build-system]
 requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"

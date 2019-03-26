@@ -320,10 +320,92 @@ but will still be available the next time it requests messages.  A device which 
 sporadically can send and receive messages to other parts of the system.
 
 Put together with other kinds of message-oriented middleware,  such as Amazon SNS,  message queues work a lot like
-"instant messaging for machines".
+"instant messaging for machines".  Usually messages pass through the system very quickly (perceptually instant)
+but the message queue gives us the slack to deal with processes that unfold over different timescales (it
+might take 100 milliseconds to get a message to and from the cloud,  30 seconds to open a garage door,  and
+a user might spend a few hours away from the house at work or school)
 
 Rabbit MQ and Gateway Script
 ============================
 
 A small Python script on the home server (Tamamo) requests messages from the message queue from SQS and copies
-them to my server
+them to my server.
+
+Two features of SQS enable very efficient polling.  First,  it is possible to receive up to 10 messages at
+a time,  so when the system is busy,  we can amortize the communications overhead over many messages.  A
+second useful feature is "long polling" which allows my script to connect to SQS for 20 seconds at a time.
+If no messages are in the queue,  the connection stays open.  The instant a message becomes available,  it
+is sent.  Thus,  we get high performance both in the case where messages are coming quickly,  and also when
+they are inferequent.
+
+I like SQS a lot,  and I could have multiple processes listening on SQS queues inside my home network,  but
+my DSL connection is not very fast.  Thus I want to download every message once and then redistribute it.
+
+I chose RabbitMQ because I already had RabbitMQ installed to support celery.
+
+Something to note is that the native protocol of RabbitMQ is AQMP 0.9.2,  which is not worse than AQMP 1.0.
+Features were removed from AQMP 1.0 to make the protocol easier to implement,  but AQMP 0.9.2 is a bit
+more feature rich,  particularly given that RabbitMQ has a few extra features.
+
+RabbitMQ also interoperates with MQTT which is popular for IoT applications.
+
+Light Control Script
+====================
+
+The light zones are configured in a YAML file that maps a list of sensors to a list of lights.  If any
+of the sensors detect motion,  we get an event and turn on the lights in that zone.  So long as people
+(or animals) are moving in front of the sensor,  the motion sensor stays in the "active" state and we
+get no further events.  However,  when the motion stops,  the sensor will time out after 15 seconds and
+then we receieve an event saying that the motion sensor is "inactive".
+
+I find it helpful to have multiple sensors controlling a zone because one sensor might not pick up motion
+reliably everywhere in the zone.  For instance,  in the upstairs hallway there are two sensors.
+
+We keep track of which sensors are active and inactive,  and after all the sensors have become inactive,
+we start a countdown timer,  and when that timer expires,  we turn off the lights.
+
+(Out of scope for the video)
+
+The requirements for the light system turn out to be a bit more complex than that.
+
+First of all,
+the actual light level desired depends on the time of day,  outdoor illumination,  etc.  The case that
+causes the most conflict in my house is how bright the light is when we are asleep.  Currently I am turning
+the lights down manually at night and then the wake up script turns them back up.
+
+Another problem is that it is hard to pick a perfect timeout.  If you sit in one place,  the sensors might
+go inactive,  in which case the lights turn off.  A longer timeout makes this happen less often,  but then
+the lights are on more often.  I am thinking I could build a predictive model to guess what the probability
+that motion will be detected in the next five minutes and that would provide an systematic way to determine
+when to time out.
+
+Another issue is that the cats are big enough to set off the sensors,  even when they are set at minimum
+sensitivity.  The first answer to that might be putting some kind of mask in from of the sensors that
+cuts off the field-of-view at low angles.  The idea is that the cats are close to the ground,  so if
+we can raise the field-of-view,  they won't be in it,  and they won't trigger the sensors.  Some more
+smarts might make the system able to guess the difference between cat and human activity but that is
+tough.
+
+Related to that is the possibility of more complex triggering rules.  For instance,  there are three
+sensors in the upstairs zone,  one of them is aimed to catch people sitting on a bench where they
+frequently become undetectable.  I've thought about increasing the sensitivity of that sensor to
+maximum but not having it be able to turn the lights on,  but only be able to prevent them from
+turning off.  Of course when you want the lights back on you will move a little so there ought to be
+a time period in which the central sensor can restart it.
+
+I did experiments with a more complex triggering scheme before and it was a disaster.  I thought the
+sensors in the stairwell were not fast enough to respond when I was walking up them,  so I added a
+sensor that covered the zone under the stairwell.  That sensor,  however,  would get tripped by
+other things.  I tried some complex rules involving that sensor controlling more than one zone and
+it was a buggy mess so I reverted to "these sensors" control "these lights" where all lights and
+sensors are treated the same.
+
+The "Defend" Program
+====================
+
+If the system is going to control the lights,  AC power has to be turned on for them.  If a house
+was built with smart lights in mind there might not be so many switches that can turn off AC
+power,  but if it is not,  you need to train the inhabitants of the house not to use the normal
+switches and when the switches are in the wrong position,  the system asks for the inhabitants to
+put them in the right position.
+
