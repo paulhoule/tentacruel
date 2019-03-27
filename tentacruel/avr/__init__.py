@@ -98,27 +98,17 @@ def only(facts):
     return list(facts)[0]
 
 async def avr_status():
-    # pylint: disable=too-many-locals
-    # pylint: disable=too-many-branches
-    # pylint: disable=too-many-statements
     host = '192.168.0.10'
-    heos = HeosClientProtocol(host)
-    await heos.setup()
-    players = heos.get_players()
-    await heos.shutdown()
-    for player in players:
-        if player["ip"] == host:
-            print(f"Model: {player['model']}   Serial: {player['serial']}")
-            print(f"Name: {player['name']}   Player Id: {player['pid']}   SW: {player['version']}")
-            print(f"IP address: {player['ip']} on {player['network']} network")
-            print("")
-
-    await heos.shutdown()
+    await heos_report(host)
     reader, writer = await open_connection(host, 23)
     reified_facts = await ask_queries(reader, writer)
     facts = set(reified_facts.keys())
-    print("Zone 1 =========================")
+    z2_facts = await zone1_report(facts)
+    await zone2_report(z2_facts)
 
+
+async def zone1_report(facts):
+    print("Zone 1 =========================")
     #
     # The "excess facts" that I am seeing when analog inputs are enabled come up as
     # {'SSALSVAL 000', 'SSALSSET ON', 'SSALSDSP OFF'}
@@ -126,11 +116,23 @@ async def avr_status():
     # I don't see these written down in the docs I am looking at.  One obnoxious thing
     # is that these come up when we are running HEOS/Tuner audio with a video channel
     #
+    await z1_main_report(facts)
+    await tuner_report(facts)
+    await ps_report(facts)
+    await cv_report(facts)
+    z2_facts = pop_fact(facts, "Z2")
+    if facts:
+        print("Stray facts in Zone 1:")
+        print(facts)
+    print()
+    return z2_facts
 
+
+async def z1_main_report(facts):
     power = only(pop_fact(facts, "PW")).capitalize()
     z1_power = only(pop_fact(facts, "ZM")).capitalize()
     slp = only(pop_fact(facts, "SLP")).capitalize()
-    pop_fact(facts, "MSQUICK")    # dont' care if a quick select has been pressed (for now)
+    pop_fact(facts, "MSQUICK")  # dont' care if a quick select has been pressed (for now)
     ms_mode = only(pop_fact(facts, "MS")).capitalize()
     print(f"Main Power: {power}   Zone 1 Power: {z1_power}   Sleep: {slp}")
     main_volume = pop_numeric(facts, "MV")
@@ -146,6 +148,8 @@ async def avr_status():
     if sv != "OFF":
         print(f"Video Source: {sv}")
 
+
+async def tuner_report(facts):
     is_am = bool(pop_fact(facts, "TMANAM"))
     bool(pop_fact(facts, "TMANFM"))
     is_auto = bool(pop_fact(facts, "TMANAUTO"))
@@ -155,29 +159,28 @@ async def avr_status():
     tpan = "Off" if tpan == "OFF" else int(tpan)
     band = "AM" if is_am else "FM"
     tuner_mode = "Auto" if is_auto else "Manual"
-
     #
     # known bug:  if the tuner is in auto mode and moving at the time
     # we scan,  we might get multiple numbers for the frequency which causes
     # a crash
     #
-
     if band == "AM":
         frequency = tfan[0:4]
         if frequency[0] == "0":
             frequency = frequency[1:]
         frequency += "kHz"
     else:
-        frequency = tfan[1:4] +"." + tfan[4:6]
+        frequency = tfan[1:4] + "." + tfan[4:6]
         if frequency[0] == "0":
             frequency = frequency[1:]
         frequency += "MHz"
-
     print(f"Band: {band}   Frequency:  {frequency}  Tuner Mode: {tuner_mode}")
     if tpan != "Off":
         print(f"Tuner Preset: Channel {tpan}")
-
     print()
+
+
+async def ps_report(facts):
     reflev = pop_numeric(facts, "PSREFLEV ")
     delay = int(only(pop_fact(facts, "PSDEL ")))
     ps_drc = only(pop_fact(facts, "PSDRC ")).capitalize()
@@ -186,21 +189,21 @@ async def avr_status():
     ps_eff = pop_numeric(facts, "PSEFF ")
     ps_tre = pop_numeric(facts, "PSTRE ")
     ps_bas = pop_numeric(facts, "PSBAS ")
-
     ps_dynamic_eq = only(pop_fact(facts, "PSDYNEQ ")).capitalize()
     ps_dynamic_vol = only(pop_fact(facts, "PSDYNVOL ")).capitalize()
     ps_rstr = only(pop_fact(facts, "PSRSTR ")).capitalize()
     ps_lom = only(pop_fact(facts, "PSLOM ")).capitalize()
     ps_tone = only(pop_fact(facts, "PSTONE CTRL ")).capitalize()
     ps_multeq = only(pop_fact(facts, "PSMULTEQ:")).capitalize()
-
     print(f"Reference Level: {reflev} dB    Delay: {delay} ms   Dynamic Range Control: {ps_drc}")
     print(f"LFE Level: {ps_lfe} dB  Effect level: {ps_eff} dB  Multichannel EQ: {ps_multeq}")
     print(f"SWR: {ps_swr}   Dynamic EQ: {ps_dynamic_eq}   Dynamic Volume: {ps_dynamic_vol}")
     print(f"Audio Restorer: {ps_rstr}  Loudness Management: {ps_lom}  Tone Control: {ps_tone}")
     print(f"Tone Control: {ps_tone}  Bass: {ps_bas} dB  Treble: {ps_tre} dB")
-
     print()
+
+
+async def cv_report(facts):
     #
     # yes,  this is my particular speaker configuration:  even with the same receiver it
     # should be possible to add other channels
@@ -212,25 +215,18 @@ async def avr_status():
     #
     # logically I think we could check to see if certain channels exist and print more
     # lines,  height at top,  back on the bottom,  not sure where to put the sub(s)
-
-
     cv_front_right = pop_numeric(facts, "CVFR ")
     cv_surround_right = pop_numeric(facts, "CVSR ")
     cv_surround_left = pop_numeric(facts, "CVSL ")
     cv_center = pop_numeric(facts, "CVC ")
     cv_front_left = pop_numeric(facts, "CVFL ")
-    pop_fact(facts, "CVEND")     # appears at end of CV presumable so we know it is done
-
+    pop_fact(facts, "CVEND")  # appears at end of CV presumable so we know it is done
     print(f"Front Left: {cv_front_left} Center: {cv_center}  Front Right: {cv_front_right}")
     print(f"Surround Left: {cv_surround_left}             Surround Right: {cv_surround_right}")
-    z2_facts = pop_fact(facts, "Z2")
-    if facts:
-        print("Stray facts in Zone 1:")
-        print(facts)
 
-    print()
+
+async def zone2_report(z2_facts):
     print("Zone 2 =========================")
-
     sleep_mode = only(pop_fact(z2_facts, "SLP")).capitalize()
     mute_mode = only(pop_fact(z2_facts, "MU")).capitalize()
     is_on = bool(pop_fact(z2_facts, "ON"))
@@ -244,10 +240,8 @@ async def avr_status():
         if fact in SOURCES:
             source_ids.append(fact)
             sources.append(SOURCES[fact])
-
     for source in source_ids:
         z2_facts.remove(source)
-
     print(f"Zone Power: {z2_power}   Volume: {z2_volume}")
     print(f"Sleep: {sleep_mode}  Mute: {mute_mode}")
     if not sources:
@@ -256,10 +250,24 @@ async def avr_status():
         print(f"Input Source: {sources[0]}")
     else:
         print(f"Error:  more than one source observed in Zone2!")
-
     if z2_facts:
         print("Stray facts found for Zone2:")
         print(z2_facts)
+
+
+async def heos_report(host):
+    heos = HeosClientProtocol(host)
+    await heos.setup()
+    players = heos.get_players()
+    await heos.shutdown()
+    for player in players:
+        if player["ip"] == host:
+            print(f"Model: {player['model']}   Serial: {player['serial']}")
+            print(f"Name: {player['name']}   Player Id: {player['pid']}   SW: {player['version']}")
+            print(f"IP address: {player['ip']} on {player['network']} network")
+            print("")
+    await heos.shutdown()
+
 
 async def ask_queries(reader, writer):
     """
@@ -286,9 +294,3 @@ async def ask_queries(reader, writer):
         for line in lines:
             facts.add(line.strip(), command)
     return facts
-
-
-if __name__ == "__main__":
-    loop = get_event_loop()
-    loop.run_until_complete(avr_status())
-    loop.close()
