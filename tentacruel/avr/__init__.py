@@ -1,12 +1,18 @@
 # pylint: disable=missing-docstring
 # pylint: disable=invalid-name
 import concurrent
-from asyncio import open_connection, get_event_loop, create_task, StreamReader, wait_for, shield
+from asyncio import open_connection, StreamReader, wait_for, shield, StreamWriter
 from decimal import Decimal
+from logging import getLogger
+import re
 from re import fullmatch
+from typing import Pattern
 
 from multidict import MultiDict
 from tentacruel import HeosClientProtocol
+
+#pylint: disable=invalid-name
+logger = getLogger(__name__)
 
 # pylint: disable=pointless-string-statement
 """
@@ -64,6 +70,29 @@ async def read_lines_until(reader: StreamReader, timeout: float):
             break
     return lines
 
+async def read_lines_matching(reader: StreamReader, *patterns: Pattern):
+    waiting_for = {}
+    for (index, pattern) in enumerate(patterns):
+        if isinstance(pattern, str):
+            pattern = re.compile(pattern)
+        waiting_for[pattern] = index
+
+    values = [None] * len(waiting_for)
+    while not reader.at_eof():
+        if all(values):
+            break
+        line = await reader.readuntil(b'\r')
+        line = line.decode("ascii").strip()
+        logger.debug("got line: %s", line)
+        for pattern in waiting_for:
+            index = waiting_for[pattern]
+            if not values[index]:
+                match = pattern.fullmatch(line)
+                if match:
+                    values[index] = match[1]
+
+    return values
+
 def pop_fact(facts, prefix):
     matching = set()
     for fact in facts:
@@ -97,7 +126,68 @@ def only(facts):
         raise ValueError(f"Facts {facts} can contain only one matching fact")
     return list(facts)[0]
 
+
+class AvrControl:
+    def __init__(self, host):
+        self.host = host
+        self.reader: StreamReader = None
+        self.writer: StreamWriter = None
+
+    async def setup(self):
+        (self.reader, self.writer) = await open_connection(self.host, 23)
+
+    async def shutdown(self):
+        self.writer.close()
+        await self.writer.wait_closed()
+
+    async def is_heos_on(self):
+        """
+
+        Some notes on power system behavior:  with the remote control you can put the
+        receiver in and out of standby by turning off both Z1 and Z2.   There is no
+        PWOFF state because in PWOFF it would not be listening on the net.
+
+        :return:
+        """
+        status = {}
+        #
+        # this returns Z2ON if Z2 is ON.  If we didn't get Z2ON by the time we got
+        # ZM back then we could probably save a millisecond or two by not asking
+        # for Z2?
+        #
+        self.writer.write(b"PW?\r")
+        await(self.writer.drain())
+        (power, ) = await read_lines_matching(self.reader, "^PW(ON|STANDBY)$")
+        status["power"] = (power == "ON")
+
+        self.writer.write(b"ZM?\r")
+        await(self.writer.drain())
+        (z1_power, ) = await read_lines_matching(self.reader, "^ZM(ON|OFF)$")
+        status["zone1"] = {}
+        status["zone1"]["power"] = (z1_power == "ON")
+
+        self.writer.write(b"SI?\r")
+        await(self.writer.drain())
+        (z1_source, ) = await read_lines_matching(self.reader, "^SI(.*)$")
+        status["zone1"]["source"] = z1_source
+
+        self.writer.write(b"Z2?\r")
+        await(self.writer.drain())
+
+        z2_source_pattern = "^Z2(" + "|".join(SOURCES.keys()) +")$"
+        (z2_power, z2_source) = \
+            await read_lines_matching(self.reader, "^Z2(ON|OFF)$", z2_source_pattern)
+        status["zone2"] = {}
+        status["zone2"]["power"] = z2_power
+        status["zone2"]["source"] = None if z2_source == "SOURCE" else z2_source
+        return status
+
 async def avr_status():
+    """
+    Show report on the AVR system status,  primarily based on the telnet API but
+    getting some version information from HEOS.
+
+    """
     host = '192.168.0.10'
     await heos_report(host)
     reader, writer = await open_connection(host, 23)
@@ -105,6 +195,8 @@ async def avr_status():
     facts = set(reified_facts.keys())
     z2_facts = await zone1_report(facts)
     await zone2_report(z2_facts)
+    writer.close()
+    await writer.wait_closed()
 
 
 async def zone1_report(facts):
