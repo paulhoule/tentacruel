@@ -6,7 +6,7 @@ from decimal import Decimal
 from logging import getLogger
 import re
 from re import fullmatch
-from typing import Pattern
+from typing import Pattern, Dict
 
 from multidict import MultiDict
 from tentacruel import HeosClientProtocol
@@ -181,6 +181,34 @@ class AvrControl:
         status["zone2"]["power"] = z2_power
         status["zone2"]["source"] = None if z2_source == "SOURCE" else z2_source
         return status
+
+    async def set_power_status(self, power_status: Dict[int, bool]) -> None:
+        """
+        Sets the power status of the speakers.  Key value pairs are set one at a
+        time.  ex.::
+
+            that.set_power_status({1: True,2: False})
+
+        :param power_status: dictionary,  key is zone number,  value is power state as a booleab
+        :return: None
+        """
+
+        for (zone, state) in power_status.items():
+            try:
+                if zone == 1:
+                    if state:
+                        self.writer.write(b"ZMON\rSINET\r")
+                    else:
+                        self.writer.write(b"ZMOFF\r")
+                elif zone == 2:
+                    if state:
+                        self.writer.write(b"Z2ON\rZ2NET\r")
+                    else:
+                        self.writer.write(b"Z2OFF\r")
+                else:
+                    raise ValueError("Only Zones 1 and 2 are supported")
+            finally:
+                await self.writer.drain()
 
 async def avr_status():
     """

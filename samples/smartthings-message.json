@@ -1,0 +1,87 @@
+{
+  "lifecycle": "EVENT",
+  "executionId": "8bfe3ceb-d5a4-48dc-b674-448aab26f933",
+  "locale": "en-US",
+  "version": "0.1.0",
+  "eventData": {
+    "authToken": "eyJraWQiOiI5dmtsOTkyYTE4ZmVNX045X2tuQ2I2dHh6Ri1LdnBwVkFNNTYtOFIwX21BIiwiYWxnIjoiUlMyNTYifQ.eyJwcmluY2lwYWwiOiJpbnN0YWxsZWRhcHA6M2QzYjlhZmItYjljYy00ZTYwLTg5ZjgtZDc4MjJkNzMzODFhOjkwMTVmMzc5LTIyYTktNDUxNC05ZmUxLTEwZDM1MTRlY2QyZiIsInNjb3BlIjpbInI6ZGV2aWNlczoqIiwicjpkZXZpY2VzOjI5YTczZGY1LTA1ZTYtNGM1ZS1hZTIzLTBmOTk3NDZiYTI3YiIsInI6ZGV2aWNlczo1MjMyZTZiMy01OGY3LTRjNzQtODA0ZC03NTcxOWQ1NmQ5MmMiLCJyOmRldmljZXM6YTIwYmFiMmUtYTdkMC00YzkzLTg3MjMtMjdhN2JmMzI5OWI2IiwicjpkZXZpY2VzOmE3Njg3NmFiLTZkZWQtNGZiNS05OTU1LTc2ZGQwY2JiNjUyNSIsInI6ZGV2aWNlczpiZjQyMzIzMC0zNDk1LTQzNzUtODAzMy02MGI0ZjdkMzQ1NWMiLCJyOmRldmljZXM6YzlkMmUzM2UtMjU4Yi00OGM1LWFmMWEtMjlhOTVmMTg5ZDgwIl0sImV4cCI6MTU1MzcxNDA5NiwiY2xpZW50X2lkIjoiOTc3OWFmODAtNmVhZi00MzgyLTk3MDgtZmJiMWRjNTg0ZTg2In0.B9Jkzf0paHNnMEwiaZNs-dL3doUrwI8BLL2MHIln0t0lItRH5eiqXoEWqpd_Ese5EHQY4Mw4sce9LsnjWoijHTeHLoALlvaEm2coBM3TCj5ZZQwHOULoLtiIXAXjT0ACD5VIPx7U4i0zvkYtMcybluDVaS3Ua1sny4VdpGFefFTn3fVznEcuMXH40NCQzIJGRRiCvaCpiZE0usFsfHB9a4oB6STTR-miVLvRYx8EiuInmNiMeIwFDkjpPtq7Vq3SWWzxcNvc6p-tdqnPhB-o-kVifV5AyJunFfKaqpPUvl4iRX8vIx7Ng-2ra4550JP0_p3Wmx7OKB9HnxoFbFJQ8A",
+    "installedApp": {
+      "installedAppId": "3d3b9afb-b9cc-4e60-89f8-d7822d73381a",
+      "locationId": "9015f379-22a9-4514-9fe1-10d3514ecd2f",
+      "config": {
+        "sensor": [
+          {
+            "valueType": "DEVICE",
+            "deviceConfig": {
+              "deviceId": "a20bab2e-a7d0-4c93-8723-27a7bf3299b6",
+              "componentId": "main"
+            }
+          },
+          {
+            "valueType": "DEVICE",
+            "deviceConfig": {
+              "deviceId": "29a73df5-05e6-4c5e-ae23-0f99746ba27b",
+              "componentId": "main"
+            }
+          },
+          {
+            "valueType": "DEVICE",
+            "deviceConfig": {
+              "deviceId": "5232e6b3-58f7-4c74-804d-75719d56d92c",
+              "componentId": "main"
+            }
+          },
+          {
+            "valueType": "DEVICE",
+            "deviceConfig": {
+              "deviceId": "c9d2e33e-258b-48c5-af1a-29a95f189d80",
+              "componentId": "main"
+            }
+          },
+          {
+            "valueType": "DEVICE",
+            "deviceConfig": {
+              "deviceId": "a76876ab-6ded-4fb5-9955-76dd0cbb6525",
+              "componentId": "main"
+            }
+          },
+          {
+            "valueType": "DEVICE",
+            "deviceConfig": {
+              "deviceId": "bf423230-3495-4375-8033-60b4f7d3455c",
+              "componentId": "main"
+            }
+          }
+        ]
+      },
+      "permissions": [
+        "r:devices:a76876ab-6ded-4fb5-9955-76dd0cbb6525",
+        "r:devices:5232e6b3-58f7-4c74-804d-75719d56d92c",
+        "r:devices:a20bab2e-a7d0-4c93-8723-27a7bf3299b6",
+        "r:devices:29a73df5-05e6-4c5e-ae23-0f99746ba27b",
+        "r:devices:c9d2e33e-258b-48c5-af1a-29a95f189d80",
+        "r:devices:bf423230-3495-4375-8033-60b4f7d3455c",
+        "r:devices:*"
+      ]
+    },
+    "events": [
+      {
+        "eventTime": "2019-03-27T19:09:56Z",
+        "eventType": "DEVICE_EVENT",
+        "deviceEvent": {
+          "eventId": "e8dea1da-50c3-11e9-979e-b5577bed101a",
+          "locationId": "9015f379-22a9-4514-9fe1-10d3514ecd2f",
+          "deviceId": "a20bab2e-a7d0-4c93-8723-27a7bf3299b6",
+          "componentId": "main",
+          "capability": "temperatureMeasurement",
+          "attribute": "temperature",
+          "value": 61.6,
+          "valueType": "string",
+          "stateChange": true,
+          "subscriptionName": "all_temperatureMeasurement_sub"
+        }
+      }
+    ]
+  },
+  "settings": {}
+}
