@@ -12,6 +12,8 @@ import yaml
 from aio_pika import connect_robust, ExchangeType
 
 # pylint: disable=invalid-name
+from arango import DocumentInsertError
+
 logger = getLogger(__name__)
 
 def connect_to_adb(config):
@@ -72,4 +74,8 @@ class LogToADB:
                     with message.process():
                         event = json.loads(message.body)
                         logger.debug("Received event: %s", event)
-                        self.collection.insert(event)
+                        try:
+                            self.collection.insert(event, silent=True)
+                        except DocumentInsertError as error:
+                            if error.error_code != 1210:
+                                raise

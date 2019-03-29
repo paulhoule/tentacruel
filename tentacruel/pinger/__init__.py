@@ -15,7 +15,7 @@ from pathlib import Path
 from uuid import uuid5, UUID, uuid3, uuid4
 
 import yaml
-from aio_pika import connect_robust, ExchangeType, Message
+from aio_pika import connect_robust, ExchangeType, Message, Connection, Exchange
 from arango import aql
 
 # pylint: disable=invalid-name
@@ -77,7 +77,8 @@ class Pinger:
         self.adb = connect_to_adb(self.config)
         self.private_network_id = UUID(self.config["private_network_id"])
         self.retry_count = retry_count
-        self.connection = None
+        self.connection: Connection = None
+        self.exchange: Exchange = None
 
     async def setup(self):
         """
@@ -87,6 +88,8 @@ class Pinger:
             loop=get_event_loop(),
             **self.config["pika"]
         )
+
+        self.exchange = await self.connect_to_exchange()
 
     async def ping_all(self):
         """
@@ -106,7 +109,7 @@ class Pinger:
 
         :return: None
         """
-        exchange = await self.connect_to_exchange()
+
         cursor = self.adb.aql.execute("""
                 FOR row in pingables
                    FILTER NOT row.disabled
@@ -133,7 +136,7 @@ class Pinger:
         self.adb.collection("pingables").update_many(update_adb)
         for event in events:
             message = Message(body=json.dumps(event).encode("ascii"))
-            await exchange.publish(message, routing_key=event["attribute"])
+            await self.exchange.publish(message, routing_key=event["attribute"])
 
     async def connect_to_exchange(self):
         """

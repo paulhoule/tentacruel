@@ -8,6 +8,4 @@ from tentacruel.pinger import ensure_proactor, Pinger
 
 if __name__ == "__main__":
     ensure_proactor()
-    # pylint: disable=invalid-name
-    pinger = Pinger()
-    run(pinger.ping_all())
+    run(Pinger().ping_all())
