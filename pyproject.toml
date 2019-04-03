@@ -18,6 +18,9 @@ pytz = "^2018.9"
 aio-pika = "^5.3"
 mutagen = "^1.42"
 multidict = "^4.5"
+imageio = "^2.5"
+bs4 = "^0.0.1"
+lxml = "^4.3"
 [build-system]
 requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"

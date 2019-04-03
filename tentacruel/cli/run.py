@@ -402,20 +402,30 @@ class Application:
                 else:
                     url = None
 
+        async def teardown(self):
+            if self._heos_client:
+                await self._heos_client.shutdown()
+
     async def run(self):
         if len(self.argv) == 1:
             self.help()
 
         commands = separate_commands(self.argv[1:])
-        for command in commands:
-            command_name = command[0]
-            idx = 1
-            # pylint: disable=protected-access
-            if command_name in self.commands._prefixes:
-                command_name = f"{command_name}_{command[1]}"
-                idx += 1
-            command_action = getattr(self.commands, command_name)
-            await command_action(command[idx:])
+        try:
+            for command in commands:
+                command_name = command[0]
+                idx = 1
+                # pylint: disable=protected-access
+                if command_name in self.commands._prefixes:
+                    command_name = f"{command_name}_{command[1]}"
+                    idx += 1
+                command_action = getattr(self.commands, command_name)
+                await command_action(command[idx:])
+        finally:
+            await self.teardown()
+
+    async def teardown(self):
+        self.commands.teardown()
 
     def help(self):
         """
