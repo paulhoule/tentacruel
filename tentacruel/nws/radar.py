@@ -5,8 +5,8 @@ Command line program to create movies for radar
 import datetime
 import re
 
+from tentacruel.config import get_config
 from tentacruel.nws import RadarFetch
-
 
 def radar_file_date(name: str) -> datetime.datetime:
     """
@@ -23,48 +23,17 @@ def radar_file_date(name: str) -> datetime.datetime:
     (year, month, day, hour, minute) = map(int, match.groups())
     return datetime.datetime(year, month, day, hour, minute, tzinfo=datetime.timezone.utc)
 
-#
-# Overlays/County/Short/BGM_County_Short.gif
-# Overlays/Highways/Short/BGM_Highways_Short.gif
-# Overlays/Rivers/Short/BGM_Rivers_Short.gif
-# Overlays/Cities/Short/BGM_City_Short.gif
-#
+def main():
+    """
+    Main method of radar fetcher program
 
-# pylint: disable=too-many-function-args
-# pylint: disable=invalid-name
-f = RadarFetch(
-    "https://radar.weather.gov/",
-    [
-        dict(
-            pattern="ridge/RadarImg/N0R/BGM/BGM_[0-9]{8}_[0-9]{4}_N0R.gif",
-            date_fn=radar_file_date,
-            overlays=[
-                "Overlays/County/Short/BGM_County_Short.gif",
-                "Overlays/Highways/Short/BGM_Highways_Short.gif",
-                "Overlays/Rivers/Short/BGM_Rivers_Short.gif",
-                "Overlays/Cities/Short/BGM_City_Short.gif"
-            ],
-            video="N0RBGM.mp4",
-            still="N0RBGM.png"
-        ),
-        dict(
-            pattern="ridge/RadarImg/N1P/BGM/BGM_[0-9]{8}_[0-9]{4}_N1P.gif",
-            date_fn=radar_file_date,
-            video="N1PBGM.mp4",
-            overlays=[
-                "Overlays/County/Short/BGM_County_Short.gif",
-                "Overlays/Highways/Short/BGM_Highways_Short.gif",
-                "Overlays/Rivers/Short/BGM_Rivers_Short.gif",
-                "Overlays/Cities/Short/BGM_City_Short.gif"
-            ],
-            still="N1PBGM.png"
-        ),
-        dict(
-            pattern="Conus/RadarImg/northeast_[0-9]{8}_[0-9]{4}.gif",
-            date_fn=radar_file_date,
-            video="northeast.mp4"
-        )
-    ]
-)
-f.refresh()
-f.make_video()
+    :return:
+    """
+    config = get_config()
+    # pylint: disable=too-many-function-args
+    fetcher = RadarFetch(config)
+    fetcher.refresh()
+    fetcher.make_video()
+
+if __name__ == '__main__':
+    main()
