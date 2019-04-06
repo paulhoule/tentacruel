@@ -7,11 +7,18 @@ import sys
 from logging import getLogger, basicConfig
 from math import floor
 from pathlib import Path
+from typing import Dict
 
 import imageio
 import numpy as np
 import requests
 from bs4 import BeautifulSoup
+from jinja2 import Environment, PackageLoader, select_autoescape
+
+JINJA = Environment(
+    loader=PackageLoader('tentacruel.nws', 'jj2'),
+    autoescape=select_autoescape(['html', 'xml'])
+)
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "ERROR")
 LOGGER = getLogger(__package__)
@@ -20,13 +27,32 @@ basicConfig(format='%(asctime)s %(levelname)s:%(message)s', level=LOG_LEVEL)
 # 600 x 576
 # to install ffmepg: imageio.plugins.ffmpeg.download()
 
+DATE_FUNCTIONS = {}
+
+def register(function):
+    DATE_FUNCTIONS[function.__name__] = function
+    return function
+
 class RadarFetch:
-    def __init__(self, config):
+    def __init__(self, config: Dict):
+        """
+
+        :param config:
+           Configuration dictionary.  The first key is "paths" and represents paths,
+           the second is "products" which represents products that this system can
+           generate.  This is not the general 'tentacruel' configuration dictionary.
+
+        """
         self._session = requests.Session()
-        self._source_base = config["source_base"]
+        self._source_base = config["paths"]["source_base"]
         self._cache = Path.home() / "radar"
-        self._patterns = config["patterns"]
-        self._output = Path(config["output"])
+        self._patterns = config["products"]
+        self._output = Path(config["paths"]["output"])
+
+    def copy_template(self):
+        template = JINJA.get_template("index.html")
+        index_out = self._output / "index.html"
+        index_out.write_text(template.render(), encoding="utf-8")
 
     def refresh(self):
         self._session = requests.Session()
@@ -88,8 +114,8 @@ class RadarFetch:
         LOGGER.info("Creating video %s", pattern['video'])
         start = datetime.datetime.now()
         infiles = self._lookup_matching(pattern)
-
-        dated = [{"path": file, "timestamp": pattern["date_fn"](file.name)} for file in infiles]
+        date_fn = DATE_FUNCTIONS[pattern["date_fn"]]
+        dated = [{"path": file, "timestamp": date_fn(file.name)} for file in infiles]
 
         now = datetime.datetime.now(datetime.timezone.utc)
         window = pattern.get("window", datetime.timedelta(days=1))

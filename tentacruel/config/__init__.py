@@ -6,6 +6,8 @@ Read YAML configuration,  connect to databases,  etc.
 
 from pathlib import Path
 import yaml
+from pkg_resources import resource_stream
+
 
 def connect_to_adb(config):
     """
@@ -19,11 +21,15 @@ def connect_to_adb(config):
     return client.db(**config["arangodb"]["events"]["database"])
 
 
-def get_config():
+def get_config(config_file="config.yaml", package=None):
     """
     Read tentacruel configuration file
 
     :return:
     """
-    with open(Path.home() / ".tentacruel" / "config.yaml") as config:
+    if package:
+        with resource_stream(package, config_file) as config:
+            return yaml.load(config)
+
+    with open(Path.home() / ".tentacruel" / config_file) as config:
         return yaml.load(config)

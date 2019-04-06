@@ -1,3 +1,8 @@
+#
+# radar system configuration that is related to a location but not the server
+# that the code runs on
+#
+
 products:
   - pattern: "ridge/RadarImg/N0R/BGM/BGM_[0-9]{8}_[0-9]{4}_N0R.gif"
     date_fn: radar_file_date
@@ -18,5 +23,5 @@ products:
       - Overlays/Cities/Short/BGM_City_Short.gif
     still: N1PBGM.png
   - pattern: Conus/RadarImg/northeast_[0-9]{8}_[0-9]{4}.gif
-    date_fn: radar_file_date,
+    date_fn: radar_file_date
     video: northeast.mp4
