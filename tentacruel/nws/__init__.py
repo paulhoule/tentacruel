@@ -143,7 +143,6 @@ class RadarFetch:
         overlays = self._load_overlays(pattern)
         overlays = self._merge_overlays(overlays)
 
-        print(dated)
         with imageio.get_writer(
                 movie_temp,
                 mode='I', fps=10) as writer:
