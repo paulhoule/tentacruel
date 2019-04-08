@@ -35,7 +35,6 @@ def main():
     product_config = get_config("radar_config.yaml", package="tentacruel.nws")
     config = {**server_config, **product_config}
 
-    # pylint: disable=too-many-function-args
     fetcher = RadarFetch(config)
     fetcher.refresh()
     fetcher.make_video()

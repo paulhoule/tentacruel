@@ -6,6 +6,7 @@ import re
 import sys
 from logging import getLogger, basicConfig
 from math import floor
+from operator import itemgetter
 from pathlib import Path
 from typing import Dict
 
@@ -33,6 +34,16 @@ def register(function):
     DATE_FUNCTIONS[function.__name__] = function
     return function
 
+RE_DURATION = re.compile(r"(\d+) (days|seconds|microseconds|milliseconds|minutes|hours|weeks)")
+def parse_duration(duration):
+    match = RE_DURATION.fullmatch(duration)
+    if not match:
+        raise ValueError(f"duration {duration} is not an integer followed by a time unit")
+    amount = int(match[1])
+    unit = match[2]
+    return datetime.timedelta(**{unit: amount})
+
+
 class RadarFetch:
     def __init__(self, config: Dict):
         """
@@ -50,9 +61,11 @@ class RadarFetch:
         self._output = Path(config["paths"]["output"])
 
     def copy_template(self):
-        template = JINJA.get_template("index.html")
-        index_out = self._output / "index.html"
-        index_out.write_text(template.render(), encoding="utf-8")
+        for pattern in self._patterns:
+            template_name = pattern["template"]
+            template = JINJA.get_template(template_name)
+            index_out = self._output / template_name
+            index_out.write_text(template.render(), encoding="utf-8")
 
     def refresh(self):
         self._session = requests.Session()
@@ -116,9 +129,10 @@ class RadarFetch:
         infiles = self._lookup_matching(pattern)
         date_fn = DATE_FUNCTIONS[pattern["date_fn"]]
         dated = [{"path": file, "timestamp": date_fn(file.name)} for file in infiles]
+        dated.sort(key=itemgetter("timestamp"))
 
         now = datetime.datetime.now(datetime.timezone.utc)
-        window = pattern.get("window", datetime.timedelta(days=1))
+        window = parse_duration(pattern.get("window", "1 days"))
 
         dated = [{**row, "age": now - row["timestamp"]} for row in dated if row["timestamp"]]
         dated = [row for row in dated if row["age"] < window]
@@ -129,6 +143,7 @@ class RadarFetch:
         overlays = self._load_overlays(pattern)
         overlays = self._merge_overlays(overlays)
 
+        print(dated)
         with imageio.get_writer(
                 movie_temp,
                 mode='I', fps=10) as writer:
