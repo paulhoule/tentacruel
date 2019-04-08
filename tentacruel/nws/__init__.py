@@ -133,9 +133,17 @@ class RadarFetch:
 
         now = datetime.datetime.now(datetime.timezone.utc)
         window = parse_duration(pattern.get("window", "1 days"))
+        retain = parse_duration(pattern.get("retain", "2 weeks"))
 
         dated = [{**row, "age": now - row["timestamp"]} for row in dated if row["timestamp"]]
-        dated = [row for row in dated if row["age"] < window]
+        video_frames = [row for row in dated if row["age"] < window]
+        ancient = [row for row in dated if row["age"] > retain]
+
+        for row in ancient:
+            try:
+                row["path"].unlink()
+            except OSError:
+                LOGGER.warning("Exception removing %s", row['path'])
 
         self._output.mkdir(parents=True, exist_ok=True)
         movie_out = str(self._output / pattern["video"])
@@ -146,7 +154,7 @@ class RadarFetch:
         with imageio.get_writer(
                 movie_temp,
                 mode='I', fps=10) as writer:
-            for item in dated:
+            for item in video_frames:
                 file = item["path"]
                 try:
                     content = self._compose_frame(file, overlays)

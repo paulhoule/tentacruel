@@ -14,6 +14,7 @@ products:
     video: N0RBGM.mp4
     still: N0RBGM.png
     window: 12 hours
+    retain: 2 weeks
     template: base_reflectivity.html
   - pattern: ridge/RadarImg/N1P/BGM/BGM_[0-9]{8}_[0-9]{4}_N1P.gif
     date_fn: radar_file_date
@@ -25,10 +26,12 @@ products:
       - Overlays/Cities/Short/BGM_City_Short.gif
     still: N1PBGM.png
     window: 2 hours
+    retain: 2 weeks
     template: index.html
   - pattern: Conus/RadarImg/northeast_[0-9]{8}_[0-9]{4}.gif
     date_fn: radar_file_date
     still: northeast.png
     video: northeast.mp4
     window: 2 days
+    retain: 2 weeks
     template: northeast.html
