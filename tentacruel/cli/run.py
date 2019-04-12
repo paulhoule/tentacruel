@@ -13,6 +13,8 @@ from tentacruel import HeosClientProtocol, _HeosPlayer, keep
 from tentacruel.cli.control_lights import ControlLights
 from tentacruel.cli.lights import LightCommands
 from tentacruel.cli.drain_sqs import DrainSQS
+from tentacruel.cli.watch_motion import WatchMotion
+
 from tentacruel.config import get_config
 
 logger = getLogger(__name__)
@@ -94,6 +96,10 @@ class Application:
 
         async def control_lights(self, parameters):
             control = ControlLights(config)
+            await control.do(parameters)
+
+        async def watch_motion(self, parameters):
+            control = WatchMotion(config)
             await control.do(parameters)
 
         async def player(self, parameters):
