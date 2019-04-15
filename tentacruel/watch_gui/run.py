@@ -5,7 +5,7 @@ GUI application to watch system status.
 """
 import asyncio
 from asyncio import run, get_event_loop, create_task
-from logging import getLogger, StreamHandler
+from logging import getLogger, StreamHandler, DEBUG
 from os import environ
 from tkinter import Button, TclError, Label
 from typing import Any, Dict
@@ -80,11 +80,26 @@ class Application(ManagedGridFrame):
         self.connection: Connection = None
 
         sensors = extract_sensor_list(config)
+        self.sensor_by_key = {}
         for sensor in sensors:
+            self.sensor_by_key[sensor["sensor_id"]] = sensor
             self._add(sensor["sensor_id"] + "-label", Label, text=sensor["name"])
             self._add(sensor["sensor_id"] + "-status", Label, text="Unknown")
 
         self._add(QUIT_BUTTON, Button, text="Quit", width=15, height=1, columnspan=1)
+
+        self.label_states = {
+            "active": {
+                "text": "active",
+                "background": "green",
+                "foreground": "black"
+            },
+            "inactive":{
+                "text" : "inactive",
+                "background": "red",
+                "foreground": "white"
+            }
+        }
 
     async def setup(self) -> None:
         """
@@ -120,7 +135,58 @@ class Application(ManagedGridFrame):
                 async for message in messages:
                     with message.process():
                         event = json.loads(message.body)
-                        print(event)
+                        await self.handle_event(event)
+
+    async def enrich_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Enrich event record with information from database
+
+        :param event: dictionary with event data,  left unchanged by this function
+        :return: dictionary enriched with additional fields based on device metadata
+        """
+        result = event.copy()
+        device_id = event["deviceId"]
+        if device_id in self.sensor_by_key:
+            result["deviceName"] = self.sensor_by_key[device_id]["name"]
+        return result
+
+    async def handle_event(self, event: Dict[str, Any]) -> None:
+        """
+
+        :param event: Dictionary of key/value pairs identified by the key "_key"
+        :return: Nothing
+        """
+        event = await self.enrich_event(event)
+        if LOGGER.isEnabledFor(DEBUG):
+            await self.log_event(event)
+        await self.update_ui(event)
+
+    async def log_event(self, event: Dict[str, Any]) -> None:
+        """
+        Write event to log.
+
+        :param event: Dictionary of key/value pairs identified by the key "_key"
+        :return: nothing
+        """
+        event_id = event["_key"]
+        LOGGER.debug("==== Event Recieved ============================")
+        for (key, value) in event.items():
+            if key != "_key":
+                LOGGER.debug("Event id (%s):  %s = %s", event_id, key, value)
+
+    async def update_ui(self, event) -> None:
+        """
+        Update user interface from event
+        :param event:
+        :return:
+        """
+        device_id = event["deviceId"]
+        if event["attribute"] == "motion":
+            if device_id in self.sensor_by_key:
+                label = self[device_id+"-status"]
+                options = self.label_states[event["value"]]
+                for (option_name, option_value) in options.items():
+                    label[option_name] = option_value
 
 
 async def amain() -> None:
