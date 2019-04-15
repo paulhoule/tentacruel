@@ -3,20 +3,41 @@
 GUI application to watch system status.
 
 """
-import asyncio
-from asyncio import run, get_event_loop, create_task
+
+import datetime
+from asyncio import run, get_event_loop, create_task, sleep
 from logging import getLogger, StreamHandler, DEBUG
 from os import environ
 from tkinter import Button, TclError, Label
 from typing import Any, Dict
 import json
+from uuid import uuid4
 
+import pytz
 from aio_pika import connect_robust, Connection, ExchangeType
-from tentacruel.config import get_config
+from tentacruel.config import get_config, connect_to_adb
 from tentacruel.gui import ManagedGridFrame
 
 QUIT_BUTTON = "quit_button"
 LOGGER = getLogger(__name__)
+EST = pytz.timezone("US/Eastern")
+
+def local_from_iso_zulu(that: str) -> datetime.datetime:
+    """
+    Convert an ISO formatted datetime in string form to a
+    datetime.datetime object zoned to the local timezone
+
+    :param that: e.g. ''"2019-04-15T17:45:16"''
+    :return: e.g::
+       datetime.datetime(2019, 4, 15, 14, 24, 49,
+          tzinfo=<DstTzInfo 'US/Eastern' EDT-1 day, 20:00:00 DST>)
+
+    from above input in US/Eastern.
+    """
+
+    raw_time = datetime.datetime.fromisoformat(that.replace("Z", ""))
+    utc_time = raw_time.replace(tzinfo=datetime.timezone.utc)
+    return utc_time.astimezone(EST)
 
 # pylint: disable=invalid-name
 async def run_tk(root, interval=0.05) -> None:
@@ -26,7 +47,7 @@ async def run_tk(root, interval=0.05) -> None:
     try:
         while root.alive:
             root.update()
-            await asyncio.sleep(interval)
+            await sleep(interval)
     except TclError as e:
         if "application has been destroyed" not in e.args[0]:
             raise
@@ -73,11 +94,13 @@ class Application(ManagedGridFrame):
         in the constructor.  But the constructor may validate it and set other
         variables in response to the configuration
         """
-        kwargs["columns"] = 2
+        kwargs["columns"] = 3
         super().__init__(**kwargs)
+
         self.alive = True
         self._pika_config = config["pika"]
-        self.connection: Connection = None
+        self.pika: Connection = None
+        self.adb = connect_to_adb(config)
 
         sensors = extract_sensor_list(config)
         self.sensor_by_key = {}
@@ -85,6 +108,7 @@ class Application(ManagedGridFrame):
             self.sensor_by_key[sensor["sensor_id"]] = sensor
             self._add(sensor["sensor_id"] + "-label", Label, text=sensor["name"])
             self._add(sensor["sensor_id"] + "-status", Label, text="Unknown")
+            self._add(sensor["sensor_id"] + "-since", Label, text=" "*8)
 
         self._add(QUIT_BUTTON, Button, text="Quit", width=15, height=1, columnspan=1)
 
@@ -112,11 +136,43 @@ class Application(ManagedGridFrame):
         :return:
         """
 
-        create_task(self.listen_on_queue())
+        create_task(self.fetch_and_listen())
 
-    async def listen_on_queue(self):
+    async def fetch_and_listen(self) -> None:
         """
-        Loop on message queue to get motion events and pass to GUI
+        "Main loop" of program:  fetch pseudo-events from arangodb to get current
+        attribute values.  Then fetch real events to keep attributes up to date
+
+        :return:
+        """
+        await self.fetch_events()
+        await self.listen_on_queue()
+
+    async def fetch_events(self) -> None:
+        """
+        Fetch psuedo-events from the 'attributes' table.  These are the attribute values of the last
+        events that happened to the system,  that,  we catch up with the existing state by replaying
+        these events and henceforth update the user interface accordingly.
+
+        :return:
+        """
+        aql_query = """
+        for row in attributes
+            let attributes = row.motion
+            filter attributes
+            return merge(attributes, {"attribute": "motion","deviceId": row._key})
+        """
+
+        current_status = list(self.adb.aql.execute(aql_query))
+        for event in current_status:
+            event = await self.enrich_event(event)
+            await self.handle_event(event)
+
+    async def listen_on_queue(self) -> None:
+        """
+        Loop on message queue to get motion events and pass to GUI.
+
+        Does not return.
 
         :return:
         """
@@ -149,9 +205,17 @@ class Application(ManagedGridFrame):
         :return: dictionary enriched with additional fields based on device metadata
         """
         result = event.copy()
+
+        # if an event doesn't have an event id,  give it one because consumers
+        # will assume it has one (e.g. event is pseudo event with current state
+        # information)
+
+        if "_key" not in result:
+            result["_key"] = uuid4()
         device_id = event["deviceId"]
         if device_id in self.sensor_by_key:
             result["deviceName"] = self.sensor_by_key[device_id]["name"]
+
         return result
 
     async def handle_event(self, event: Dict[str, Any]) -> None:
@@ -191,6 +255,13 @@ class Application(ManagedGridFrame):
                 options = self.label_states[event["value"]]
                 for (option_name, option_value) in options.items():
                     label[option_name] = option_value
+
+                since = self[device_id + "-since"]
+                if "eventTime" in event:
+                    when = local_from_iso_zulu(event["eventTime"])
+                    since["text"] = when.time().isoformat()
+
+
 
 
 async def amain() -> None:
