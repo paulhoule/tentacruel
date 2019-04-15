@@ -104,10 +104,14 @@ class Application(ManagedGridFrame):
     async def setup(self) -> None:
         """
         Setup stage completed asynchronously so we can use asynchronous
-        facilities to do th e setup
+        facilities to do the setup
+
+        Note we do not await here,  but use create_task() to schedule the
+        app to run later so the caller can launch additional tasks.
 
         :return:
         """
+
         create_task(self.listen_on_queue())
 
     async def listen_on_queue(self):

@@ -12,7 +12,7 @@ import yaml
 from aio_pika import connect_robust, ExchangeType
 
 # pylint: disable=invalid-name
-from arango import DocumentInsertError
+from arango import DocumentInsertError, DocumentUpdateError
 
 logger = getLogger(__name__)
 
@@ -41,6 +41,7 @@ class LogToADB:
             self.config = yaml.load(a_stream)
         adb = connect_to_adb(self.config)
         self.collection = adb.collection("sqs_events")
+        self.attributes = adb.collection("attributes")
         self.connection = None
 
     async def setup(self):
@@ -79,3 +80,18 @@ class LogToADB:
                         except DocumentInsertError as error:
                             if error.error_code != 1210:
                                 raise
+                        if "attribute" in event and "value" in event:
+                            packet = {
+                                "_key": event["deviceId"],
+                                event["attribute"]: {
+                                    "value": event["value"],
+                                    "eventTime": event["eventTime"]
+                                }
+                            }
+
+                            try:
+                                self.attributes.update(packet, silent=True)
+                            except DocumentUpdateError as error:
+                                if error.error_code != 1202:
+                                    raise
+                                self.attributes.insert(packet, silent=True)
