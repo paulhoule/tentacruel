@@ -143,6 +143,8 @@ class RadarFetch:
         ancient = [row for row in dated if row["age"] > retain]
 
         if not video_frames:
+            for row in dated[-25:]:
+                LOGGER.debug(row)
             raise ValueError(f"I can't make a video {pattern['video']} without any frames")
 
         for row in ancient:
