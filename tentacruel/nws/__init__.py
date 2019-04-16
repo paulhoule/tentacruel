@@ -121,6 +121,7 @@ class RadarFetch:
             self._make_still(pattern)
 
     # pylint: disable=too-many-locals
+    # pylint: disable=too-many-statements
     def _make_video(self, pattern):
         LOGGER.info("Creating video %s", pattern['video'])
         start = datetime.datetime.now()
@@ -137,9 +138,14 @@ class RadarFetch:
         video_frames = [row for row in dated if row["age"] < window]
         ancient = [row for row in dated if row["age"] > retain]
 
+        if not video_frames:
+            raise ValueError(f"I can't make a video {pattern['video']} without any frames")
+
         for row in ancient:
             try:
+                LOGGER.debug("Removing old file %s", row["path"])
                 row["path"].unlink()
+
             except OSError:
                 LOGGER.warning("Exception removing %s", row['path'])
 
