@@ -66,8 +66,9 @@ class RadarFetch:
         else:
             template_name = pattern["template"]
 
+        destination = pattern["template"]
         template = JINJA.get_template(template_name)
-        index_out = self._output / template_name
+        index_out = self._output / destination
         index_out.write_text(template.render(), encoding="utf-8")
 
     def refresh(self):
