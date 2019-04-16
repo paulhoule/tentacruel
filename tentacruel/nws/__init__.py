@@ -157,6 +157,7 @@ class RadarFetch:
             for item in video_frames:
                 file = item["path"]
                 try:
+                    LOGGER.debug("Composing frame from file %s", file)
                     content = self._compose_frame(file, overlays)
                 except ValueError as err:
                     print(str(type(err)) + ":" + str(err))

@@ -5,11 +5,24 @@ General-use classes for Tentacruel TK applications
 
 # pylint: disable=invalid-name
 import asyncio
-from asyncio import create_task, Task
-from tkinter import Frame
+from asyncio import create_task, Task, sleep
+from tkinter import Frame, TclError
 from typing import Any, Coroutine, Callable
 
 from tentacruel import keep, discard
+
+# pylint: disable=invalid-name
+async def run_tk(root, interval=0.05) -> None:
+    '''
+    Run a tkinter app in an asyncio event loop.
+    '''
+    try:
+        while root.alive:
+            root.update()
+            await sleep(interval)
+    except TclError as e:
+        if "application has been destroyed" not in e.args[0]:
+            raise
 
 # pylint: disable=too-few-public-methods
 class STAR():

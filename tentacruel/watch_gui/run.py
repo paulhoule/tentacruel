@@ -9,14 +9,14 @@ from asyncio import run, get_event_loop, create_task, sleep
 from logging import getLogger, StreamHandler, DEBUG
 from os import environ
 from tkinter import Button, TclError, Label
-from typing import Any, Dict
+from typing import Any, Dict, List
 import json
 from uuid import uuid4
 
 import pytz
 from aio_pika import connect_robust, Connection, ExchangeType
 from tentacruel.config import get_config, connect_to_adb
-from tentacruel.gui import ManagedGridFrame
+from tentacruel.gui import ManagedGridFrame, run_tk
 
 QUIT_BUTTON = "quit_button"
 LOGGER = getLogger(__name__)
@@ -38,19 +38,6 @@ def local_from_iso_zulu(that: str) -> datetime.datetime:
     raw_time = datetime.datetime.fromisoformat(that.replace("Z", ""))
     utc_time = raw_time.replace(tzinfo=datetime.timezone.utc)
     return utc_time.astimezone(EST)
-
-# pylint: disable=invalid-name
-async def run_tk(root, interval=0.05) -> None:
-    '''
-    Run a tkinter app in an asyncio event loop.
-    '''
-    try:
-        while root.alive:
-            root.update()
-            await sleep(interval)
-    except TclError as e:
-        if "application has been destroyed" not in e.args[0]:
-            raise
 
 def extract_sensor_list(config: Dict[str, Any]):
     """
@@ -87,28 +74,40 @@ class Application(ManagedGridFrame):
 
     """
 
-    def __init__(self, config: Dict[str, Any], **kwargs):
+    def __init__(self,
+        config: Dict[str, Any],
+        attributes: List[str],
+        **kwargs):
         """
 
         :param config: tentacruel configuration dictionary;  this is not saved
         in the constructor.  But the constructor may validate it and set other
         variables in response to the configuration
         """
-        kwargs["columns"] = 3
+        if len(attributes)==1:
+            kwargs["columns"] = 3
+            self.has_since = True
+        else:
+            kwargs["columns"] = 1 + len(attributes)
+            self.has_since = False
+
         super().__init__(**kwargs)
 
         self.alive = True
         self._pika_config = config["pika"]
         self.pika: Connection = None
         self.adb = connect_to_adb(config)
+        self.attributes = attributes
 
         sensors = extract_sensor_list(config)
         self.sensor_by_key = {}
         for sensor in sensors:
             self.sensor_by_key[sensor["sensor_id"]] = sensor
             self._add(sensor["sensor_id"] + "-label", Label, text=sensor["name"])
-            self._add(sensor["sensor_id"] + "-status", Label, text="Unknown")
-            self._add(sensor["sensor_id"] + "-since", Label, text=" "*8)
+            for attribute in attributes:
+                self._add(sensor["sensor_id"] + "-a-" + attribute, Label, text="Unknown")
+            if len(attributes) == 1:
+                self._add(sensor["sensor_id"] + "-since", Label, text=" "*8)
 
         self._add(QUIT_BUTTON, Button, text="Quit", width=15, height=1, columnspan=1)
 
@@ -251,15 +250,16 @@ class Application(ManagedGridFrame):
         device_id = event["deviceId"]
         if event["attribute"] == "motion":
             if device_id in self.sensor_by_key:
-                label = self[device_id+"-status"]
+                label = self[device_id+"-a-"+event["attribute"]]
                 options = self.label_states[event["value"]]
                 for (option_name, option_value) in options.items():
                     label[option_name] = option_value
 
-                since = self[device_id + "-since"]
-                if "eventTime" in event:
-                    when = local_from_iso_zulu(event["eventTime"])
-                    since["text"] = when.time().isoformat()
+                if self.has_since:
+                    since = self[device_id + "-since"]
+                    if "eventTime" in event:
+                        when = local_from_iso_zulu(event["eventTime"])
+                        since["text"] = when.time().isoformat()
 
 
 
@@ -273,7 +273,7 @@ async def amain() -> None:
     :return:
     """
     config = get_config()
-    app = Application(config)
+    app = Application(config,["motion"])
     await app.setup()
     await run_tk(app)
 
