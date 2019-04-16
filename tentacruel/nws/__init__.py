@@ -41,6 +41,8 @@ def parse_duration(duration):
     unit = match[2]
     return datetime.timedelta(**{unit: amount})
 
+class NoVideoFrames(ValueError):
+    pass
 
 class RadarFetch:
     def __init__(self, config: Dict):
@@ -58,12 +60,15 @@ class RadarFetch:
         self._patterns = config["products"]
         self._output = Path(config["paths"]["output"])
 
-    def copy_template(self):
-        for pattern in self._patterns:
+    def copy_template(self, pattern, failed=True):
+        if failed:
+            template_name = "failed.html"
+        else:
             template_name = pattern["template"]
-            template = JINJA.get_template(template_name)
-            index_out = self._output / template_name
-            index_out.write_text(template.render(), encoding="utf-8")
+
+        template = JINJA.get_template(template_name)
+        index_out = self._output / template_name
+        index_out.write_text(template.render(), encoding="utf-8")
 
     def refresh(self):
         self._session = requests.Session()
@@ -117,8 +122,13 @@ class RadarFetch:
 
     def make_video(self):
         for pattern in self._patterns:
-            self._make_video(pattern)
-            self._make_still(pattern)
+            try:
+                self._make_video(pattern)
+                self._make_still(pattern)
+                self.copy_template(pattern)
+            except NoVideoFrames:
+                self.copy_template(pattern, failed=True)
+
 
     # pylint: disable=too-many-locals
     # pylint: disable=too-many-statements
@@ -145,7 +155,7 @@ class RadarFetch:
         if not video_frames:
             for row in dated[-25:]:
                 LOGGER.debug(row)
-            raise ValueError(f"I can't make a video {pattern['video']} without any frames")
+            raise NoVideoFrames(f"I can't make a video {pattern['video']} without any frames")
 
         for row in ancient:
             try:

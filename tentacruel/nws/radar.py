@@ -45,7 +45,6 @@ def main():
     fetcher = RadarFetch(config)
     fetcher.refresh()
     fetcher.make_video()
-    fetcher.copy_template()
 
 if __name__ == '__main__':
     main()
