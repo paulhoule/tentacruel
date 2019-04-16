@@ -60,7 +60,7 @@ class RadarFetch:
         self._patterns = config["products"]
         self._output = Path(config["paths"]["output"])
 
-    def copy_template(self, pattern, failed=True):
+    def copy_template(self, pattern, failed=False):
         if failed:
             template_name = "failed.html"
         else:
