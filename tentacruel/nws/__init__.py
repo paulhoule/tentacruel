@@ -126,6 +126,10 @@ class RadarFetch:
         LOGGER.info("Creating video %s", pattern['video'])
         start = datetime.datetime.now()
         infiles = self._lookup_matching(pattern)
+        if infiles:
+            LOGGER.debug("Found %d image files matching pattern %s", len(infiles), pattern)
+        else:
+            LOGGER.error("No image files found matching pattern %s", pattern)
         date_fn = DATE_FUNCTIONS[pattern["date_fn"]]
         dated = [{"path": file, "timestamp": date_fn(file.name)} for file in infiles]
         dated.sort(key=itemgetter("timestamp"))
