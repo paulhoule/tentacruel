@@ -5,10 +5,10 @@ GUI application to watch system status.
 """
 
 import datetime
-from asyncio import run, get_event_loop, create_task, sleep
+from asyncio import run, get_event_loop, create_task
 from logging import getLogger, StreamHandler, DEBUG
 from os import environ
-from tkinter import Button, TclError, Label
+from tkinter import Button, Label
 from typing import Any, Dict, List
 import json
 from uuid import uuid4
@@ -66,6 +66,7 @@ def extract_sensor_list(config: Dict[str, Any]):
 
 
 # pylint: disable=too-many-ancestors
+# pylint: disable=too-many-instance-attributes
 class Application(ManagedGridFrame):
     """
     This application shows a visual display of the system state,  for instance,
@@ -75,16 +76,16 @@ class Application(ManagedGridFrame):
     """
 
     def __init__(self,
-        config: Dict[str, Any],
-        attributes: List[str],
-        **kwargs):
+                 config: Dict[str, Any],
+                 attributes: List[str],
+                 **kwargs):
         """
 
         :param config: tentacruel configuration dictionary;  this is not saved
         in the constructor.  But the constructor may validate it and set other
         variables in response to the configuration
         """
-        if len(attributes)==1:
+        if len(attributes) == 1:
             kwargs["columns"] = 3
             self.has_since = True
         else:
@@ -262,8 +263,6 @@ class Application(ManagedGridFrame):
                         since["text"] = when.time().isoformat()
 
 
-
-
 async def amain() -> None:
     """
     amain is a main method,  but it is asynchronous,  main() jumps into here
@@ -273,7 +272,7 @@ async def amain() -> None:
     :return:
     """
     config = get_config()
-    app = Application(config,["motion"])
+    app = Application(config, ["motion"])
     await app.setup()
     await run_tk(app)
 

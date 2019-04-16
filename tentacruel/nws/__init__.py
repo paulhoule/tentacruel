@@ -21,9 +21,7 @@ JINJA = Environment(
     autoescape=select_autoescape(['html', 'xml'])
 )
 
-LOG_LEVEL = os.environ.get("LOG_LEVEL", "ERROR")
 LOGGER = getLogger(__package__)
-basicConfig(format='%(asctime)s %(levelname)s:%(message)s', level=LOG_LEVEL)
 
 # 600 x 576
 # to install ffmepg: imageio.plugins.ffmpeg.download()
@@ -151,6 +149,7 @@ class RadarFetch:
         overlays = self._load_overlays(pattern)
         overlays = self._merge_overlays(overlays)
 
+        LOGGER.debug("Preparing to write movie to %s", movie_temp)
         with imageio.get_writer(
                 movie_temp,
                 mode='I', fps=10) as writer:

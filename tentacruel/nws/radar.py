@@ -4,6 +4,8 @@ Command line program to create movies for radar
 """
 import datetime
 import re
+from logging import getLogger, StreamHandler
+from os import environ
 
 from tentacruel.config import get_config
 from tentacruel.nws import RadarFetch, register
@@ -31,6 +33,11 @@ def main():
 
     :return:
     """
+    if "LOGGING_LEVEL" in environ:
+        getLogger(None).setLevel(environ["LOGGING_LEVEL"])
+
+    getLogger(None).addHandler(StreamHandler())
+
     server_config = get_config("wx-paths.yaml")
     product_config = get_config("radar_config.yaml", package="tentacruel.nws")
     config = {**server_config, **product_config}
