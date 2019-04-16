@@ -84,7 +84,7 @@ class RadarFetch:
         target_dir.mkdir(parents=True, exist_ok=True)
 
         url_directory = self._source_base + product_dir + "/"
-        LOGGER.warning("Checking %s", url_directory)
+        LOGGER.debug("Checking %s", url_directory)
         target = self._session.get(url_directory).text
         soup = BeautifulSoup(target, features="lxml")
         links = soup.find_all("a")
