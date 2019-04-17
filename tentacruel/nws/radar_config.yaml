@@ -4,27 +4,27 @@
 #
 
 products:
-  - pattern: "ridge/RadarImg/N0R/BGM/BGM_[0-9]{8}_[0-9]{4}_N0R.gif"
+  - pattern: "ridge/RadarImg/N0R/TYX/TYX_[0-9]{8}_[0-9]{4}_N0R.gif"
     date_fn: radar_file_date
     overlays:
-      - Overlays/County/Short/BGM_County_Short.gif
-      - Overlays/Highways/Short/BGM_Highways_Short.gif
-      - Overlays/Rivers/Short/BGM_Rivers_Short.gif
-      - Overlays/Cities/Short/BGM_City_Short.gif
-    video: N0RBGM.mp4
-    still: N0RBGM.png
+      - Overlays/County/Short/TYX_County_Short.gif
+      - Overlays/Highways/Short/TYX_Highways_Short.gif
+      - Overlays/Rivers/Short/TYX_Rivers_Short.gif
+      - Overlays/Cities/Short/TYX_City_Short.gif
+    video: N0RTYX.mp4
+    still: N0RTYX.png
     window: 12 hours
     retain: 2 weeks
     template: base_reflectivity.html
-  - pattern: ridge/RadarImg/N1P/BGM/BGM_[0-9]{8}_[0-9]{4}_N1P.gif
+  - pattern: ridge/RadarImg/N1P/TYX/TYX_[0-9]{8}_[0-9]{4}_N1P.gif
     date_fn: radar_file_date
-    video: N1PBGM.mp4
+    video: N1PTYX.mp4
     overlays:
-      - Overlays/County/Short/BGM_County_Short.gif
-      - Overlays/Highways/Short/BGM_Highways_Short.gif
-      - Overlays/Rivers/Short/BGM_Rivers_Short.gif
-      - Overlays/Cities/Short/BGM_City_Short.gif
-    still: N1PBGM.png
+      - Overlays/County/Short/TYX_County_Short.gif
+      - Overlays/Highways/Short/TYX_Highways_Short.gif
+      - Overlays/Rivers/Short/TYX_Rivers_Short.gif
+      - Overlays/Cities/Short/TYX_City_Short.gif
+    still: N1PTYX.png
     window: 2 hours
     retain: 2 weeks
     template: index.html
