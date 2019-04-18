@@ -60,7 +60,7 @@ class RadarFetch:
         self._patterns = config["products"]
         self._output = Path(config["paths"]["output"])
 
-    def copy_template(self, pattern, failed=False):
+    def copy_template(self, pattern, failed=False, **kwargs):
         if failed:
             template_name = "failed.html"
         else:
@@ -69,7 +69,7 @@ class RadarFetch:
         destination = pattern["template"]
         template = JINJA.get_template(template_name)
         index_out = self._output / destination
-        index_out.write_text(template.render(), encoding="utf-8")
+        index_out.write_text(template.render(**kwargs), encoding="utf-8")
 
     def refresh(self):
         self._session = requests.Session()
@@ -124,9 +124,9 @@ class RadarFetch:
     def make_video(self):
         for pattern in self._patterns:
             try:
-                self._make_video(pattern)
+                last_date = self._make_video(pattern)
                 self._make_still(pattern)
-                self.copy_template(pattern)
+                self.copy_template(pattern, last_date=last_date.isoformat())
             except NoVideoFrames:
                 self.copy_template(pattern, failed=True)
 
@@ -217,6 +217,7 @@ class RadarFetch:
         os.rename(movie_temp, movie_out)
         end = datetime.datetime.now()
         LOGGER.info("Completed video %s in time %s", pattern['video'], end - start)
+        return date_fn(video_frames[-1]["path"].name)
 
     def _lookup_matching(self, pattern):
         product_dir = "/".join(pattern["pattern"].split("/")[:-1])
@@ -224,8 +225,6 @@ class RadarFetch:
         ext = pattern["pattern"][-3:]
         infiles = sorted(src.glob(f"*.{ext}"))
         return infiles
-
-
 
     def _make_still(self, pattern):
         if "still" not in pattern:

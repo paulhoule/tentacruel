@@ -8,12 +8,19 @@
             .pred1hr { display: flex; width: 1250px; margin: auto}
             figcaption { font-weight: bold}
         </style>
+        <meta http-equiv="refresh" content="120">
     </head>
     <body>
         <h1>Northeast Regional</h1>
         <div class="navbar">
             <a href="base_reflectivity.html">Base Reflectivity</a> |
-            <a href=".">Precipitation Prediction</a>
+            <a href=".">Precipitation Prediction</a><br>
+            <script>
+                last_date = Date.parse("{{ last_date }}")
+                seconds = (Date.now()-last_date)/1000
+                minutes = Math.floor(seconds/60)
+                document.write("latest radar image captured "+minutes+" minutes ago")
+            </script>
         </div>
         <div class="pred1hr">
             <figure class="latest">
