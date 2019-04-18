@@ -181,11 +181,13 @@ class RadarFetch:
                 try:
                     LOGGER.debug("Composing frame from file %s", file)
                     content = self._compose_frame(file, overlays)
-                except ValueError as err:
-                    print(str(type(err)) + ":" + str(err))
-                    print("Could not read image from " + str(file) + " deleting")
+                except Exception: # pylint: disable=broad-except
+                    #
+                    # PIL throws fairly random errors when parsing a corrupt file,  so I
+                    # catch Exception to get them all
+                    #
+                    LOGGER.info("Could not read image from %s deleting", file, exc_info=True)
                     try:
-                        # if the file is corrupt ignore it and get rid of it
                         file.unlink()
                         # on Windows the file might not have been released by imageio and we might
                         # not be able to delete it
