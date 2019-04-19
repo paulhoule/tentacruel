@@ -6,6 +6,7 @@ import json
 import re
 import sys
 from asyncio import sleep, get_event_loop
+from ipaddress import IPv4Address
 from logging import getLogger, StreamHandler
 from os import environ
 from arango import DocumentGetError
@@ -15,7 +16,7 @@ from tentacruel.cli.lights import LightCommands
 from tentacruel.cli.drain_sqs import DrainSQS
 from tentacruel.cli.watch_motion import WatchMotion
 
-from tentacruel.config import get_config
+from tentacruel.config import get_config, connect_to_adb
 
 logger = getLogger(__name__)
 if "LOGGING_LEVEL" in environ:
@@ -108,26 +109,73 @@ class Application:
                                  "  the number or name of the player")
 
             player_specification = parameters[0]
-            pid = self._parse_player_specification(player_specification)
+            pid = await self._parse_player_specification(player_specification)
 
             heos = await self._heos()
             self._player = heos[pid]
 
-        # pylint: disable=no-self-use
-        def _parse_player_specification(self, player_specification):
-            pid = None
-            try:
-                pid = int(player_specification)
-            except ValueError:
-                for player in players:
-                    if player["key"] == player_specification:
-                        pid = player["pid"]
-                        break
-            if not pid:
+        async def _parse_player_specification(self, player_specification: str):
+            search_for = dict()
+            for player in players:
+                if player["key"] == player_specification:
+                    valid_identifiers = {"name", "model", "ip", "pid", "serial"}
+                    search_for = keep(player, valid_identifiers)
+                    if not search_for:
+                        raise ValueError(
+                            "No valid identifiers found for player in configuration file.  "
+                            f"Valid identifiers are: {valid_identifiers}")
+
+            if not search_for:
+                try:
+                    search_for["pid"] = int(player_specification)
+                except ValueError:
+                    pass
+
+            if not search_for:
+                try:
+                    IPv4Address(player_specification)
+                    search_for["ip"] = player_specification
+                except ValueError:
+                    pass
+
+            if not search_for:
                 raise ValueError(
-                    "You much specify a numeric player id or player key"
-                    " registered in the configuration file")
-            return pid
+                    "A player must be specified by a name registered in the "
+                    "configuration file,  an integer player id,  or an ip address"
+                )
+
+            return await self._lookup_player(search_for)
+
+        async def _lookup_player(self, search_for: dict) -> int:
+            """
+            Look up player id of HEOS player given a dict which contains key-value
+            pairs that match attributes of the player information returned from
+            the heos system (ex. "name",  "ip",  "pid", ...)
+
+            :param search_for: query parameters
+            :return: integer if query matches one and only one device
+            :raises: ValueError otherwise or if query invalid (ex. non-integer pid)
+            """
+
+            heos = await self._heos()
+            player_info = heos.get_players()
+
+            matching = []
+            for player in player_info:
+                all_matched = True
+                for (key, value) in search_for.items():
+                    if player.get(key) != value:
+                        all_matched = False
+                if all_matched:
+                    matching.append(player["pid"])
+
+            if not matching:
+                raise ValueError(f"Did not find player matching parameters: {search_for}")
+
+            if len(matching) > 2:
+                raise ValueError(f"Found multiple players matching parameters: {search_for}")
+
+            return matching[0]
 
         async def play(self, parameters):
             if not parameters:
@@ -154,7 +202,7 @@ class Application:
                         return dict(entry)
 
         async def _search_network_tracks(self, track):
-            adb = self._connect_to_adb()
+            adb = connect_to_adb(config)
             collection = adb.collection("tracks")
             try:
                 return collection.get(track)
@@ -306,6 +354,7 @@ class Application:
             raise ValueError("You must specify a numeric amount of time to wait")
 
         def _convert_to_seconds(self, duration, unit):
+            # pylint: disable = no-self-use
             if unit in {"s", "sec", "seconds", "second"}:
                 pass
             elif unit in {"m", "min", "minutes", "minute"}:
@@ -365,16 +414,11 @@ class Application:
                         self._lights.bridge.set_light(light, "on", False)
                     return False
 
-        def _connect_to_adb(self):
-            from arango import ArangoClient
-            client = ArangoClient(**config["arangodb"]["events"]["client"])
-            return client.db(**config["arangodb"]["events"]["database"])
-
         async def load_tracks(self, parameters):
             if parameters:
                 raise ValueError("load_tracks takes no parameters")
 
-            adb = self._connect_to_adb()
+            adb = connect_to_adb(config)
             collection = adb.collection("tracks")
             for track in config["tracks"]:
                 track["_key"] = track["key"]
@@ -384,7 +428,7 @@ class Application:
         async def read_smartthings_configuration(self, parameters):
             if parameters:
                 raise ValueError("read_smartthings_configuration takes no parameters")
-            adb = self._connect_to_adb()
+            adb = connect_to_adb(config)
             collection = adb.collection("devices")
             import requests
             access_token = config["smartthings"]["personal_access_token"]
@@ -431,7 +475,7 @@ class Application:
             await self.teardown()
 
     async def teardown(self):
-        self.commands.teardown()
+        await self.commands.teardown()
 
     def help(self):
         """
