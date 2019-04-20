@@ -2,5 +2,6 @@
 <project version="4">
   <component name="PylintConfigService">
     <option name="customPylintPath" value="C:\Users\paul_2fb85i5\AppData\Local\pypoetry\Cache\virtualenvs\tentacruel-py3.7\Scripts\pylint.exe" />
+    <option name="scanBeforeCheckin" value="false" />
   </component>
 </project>
