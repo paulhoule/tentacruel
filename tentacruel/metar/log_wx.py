@@ -37,9 +37,7 @@ async def amain() -> None:
         except ClientConnectorError:
             (_, exception, _) = exc_info()
             inner_exception = exception.os_error
-            LOGGER.error("CAUGHT EXCEPTION %s", inner_exception)
-            print("Content " + str(inner_exception))
-            if inner_exception is gaierror and "Temporary" in str(inner_exception):
+            if isinstance(inner_exception, gaierror) and "Temporary" in str(inner_exception):
                 return
             raise
         try:
