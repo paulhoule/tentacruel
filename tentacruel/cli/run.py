@@ -283,7 +283,7 @@ class Application:
             if parameters == ['all']:
                 pid_list = [player.pid() for player in heos.players.values()]
             else:
-                pid_list = [self._parse_player_specification(x) for x in parameters]
+                pid_list = [await self._parse_player_specification(x) for x in parameters]
             await heos.group.set_group(pid_list)
 
         # pylint: disable=too-many-branches
