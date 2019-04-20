@@ -41,9 +41,6 @@ def test_b0rked_05():
     with raises(ValueError):
         parse_duration("3.2 seconds")
 
-def test_x_date_from_file():
-    "CCX_20190418_1617_N0R.gif"
-
 if __name__ == "__main__":
     import pytest
     pytest.main()
