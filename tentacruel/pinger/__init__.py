@@ -49,7 +49,7 @@ async def ping(host):
     param = '-n' if platform.system().lower() == 'windows' else '-c'
 
     # Building the command. Ex: "ping -c 1 google.com"
-    if "/" in host:
+    if ":" in host:
         if platform.system().lower() == 'windows':
             raise NotImplementedError("I don't know how to ping from an interface on windows")
 
