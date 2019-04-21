@@ -34,14 +34,29 @@ def iso_zulu_now():
 async def ping(host):
     """
     Returns True if host (str) responds to a ping request.
-    Remember that a host may not respond to a ping (ICMP) request even if the host name is valid.
+
+    :param host:
+       either a dotted quad (eg. ``192.168.0.5``) or two dotted quads separated by a slash
+       (eg. ``192.168.0.200/8.8.8.8``) in which case ping binds to the first address on the
+       local computer and pings the second address.  Our network is configured so that ``.200``
+       goes through one WAN port and ``.201`` goes through the other,  so this can test the
+       two WAN ports separately.
+    :return: ``True`` if ping was responded to,  ``False`` otherwise
+
     """
 
-    # Option for the number of packets as a function of
+    # Option for the number of packets
     param = '-n' if platform.system().lower() == 'windows' else '-c'
 
     # Building the command. Ex: "ping -c 1 google.com"
-    command = ['ping', param, '1', host]
+    if "/" in host:
+        if platform.system().lower() == 'windows':
+            raise NotImplementedError("I don't know how to ping from an interface on windows")
+
+        (interface, destination) = host.split("/")
+        command = ['ping', param, '1', '-I', interface, destination]
+    else:
+        command = ['ping', param, '1', host]
 
     process = await create_subprocess_exec(*command, stdout=PIPE, stderr=STDOUT)
     (stdout, _) = await process.communicate()
