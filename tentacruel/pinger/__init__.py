@@ -19,6 +19,8 @@ from aio_pika import connect_robust, ExchangeType, Message, Connection, Exchange
 from arango import aql
 
 # pylint: disable=invalid-name
+from tentacruel.config import get_config, connect_to_adb
+
 logger = getLogger(__name__)
 
 def iso_zulu_now():
@@ -50,18 +52,6 @@ async def ping(host):
 
     return stdout.find(b"unreachable.") == -1
 
-
-def connect_to_adb(config):
-    """
-    Connect to arango database
-
-    :param config:
-    :return:
-    """
-    from arango import ArangoClient
-    client = ArangoClient(**config["arangodb"]["events"]["client"])
-    return client.db(**config["arangodb"]["events"]["database"])
-
 class Pinger:
     """
     Implementation of the application that does periodic logging and pings.
@@ -72,8 +62,7 @@ class Pinger:
             getLogger(None).setLevel(environ["LOGGING_LEVEL"])
 
         getLogger(None).addHandler(StreamHandler())
-        with open(Path.home() / ".tentacruel" / "config.yaml") as a_stream:
-            self.config = yaml.load(a_stream)
+        self.config = get_config()
         self.adb = connect_to_adb(self.config)
         self.private_network_id = UUID(self.config["private_network_id"])
         self.retry_count = retry_count
