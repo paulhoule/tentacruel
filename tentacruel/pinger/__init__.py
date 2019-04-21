@@ -36,8 +36,8 @@ async def ping(host):
     Returns True if host (str) responds to a ping request.
 
     :param host:
-       either a dotted quad (eg. ``192.168.0.5``) or two dotted quads separated by a slash
-       (eg. ``192.168.0.200/8.8.8.8``) in which case ping binds to the first address on the
+       either a dotted quad (eg. ``192.168.0.5``) or two dotted quads separated by a ``:``
+       (eg. ``192.168.0.200:8.8.8.8``) in which case ping binds to the first address on the
        local computer and pings the second address.  Our network is configured so that ``.200``
        goes through one WAN port and ``.201`` goes through the other,  so this can test the
        two WAN ports separately.
@@ -53,7 +53,7 @@ async def ping(host):
         if platform.system().lower() == 'windows':
             raise NotImplementedError("I don't know how to ping from an interface on windows")
 
-        (interface, destination) = host.split("/")
+        (interface, destination) = host.split(":")
         command = ['ping', param, '1', '-I', interface, destination]
     else:
         command = ['ping', param, '1', host]
