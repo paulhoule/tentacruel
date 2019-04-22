@@ -61,6 +61,9 @@ async def bfetch(session: ClientSession, url: str):
     :return:
     """
     async with session.get(url) as response:
+        if response.status >= 400:
+            LOGGER.error("Got status %s for GET %s", response.status, url)
+
         response.raise_for_status()
         return await response.read()
 
