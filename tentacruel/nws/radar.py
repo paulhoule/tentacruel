@@ -4,11 +4,18 @@ Command line program to create movies for radar
 """
 import datetime
 import re
+
+from asyncio import get_event_loop
 from logging import getLogger, StreamHandler
 from os import environ
+from sys import exc_info
 
+
+from aiohttp import ClientConnectorError
 from tentacruel.config import get_config
 from tentacruel.nws import RadarFetch, register
+
+from _socket import gaierror
 
 
 @register
@@ -27,7 +34,7 @@ def radar_file_date(name: str) -> datetime.datetime:
     (year, month, day, hour, minute) = map(int, match.groups())
     return datetime.datetime(year, month, day, hour, minute, tzinfo=datetime.timezone.utc)
 
-def main():
+async def amain() -> None:
     """
     Main method of radar fetcher program
 
@@ -43,8 +50,27 @@ def main():
     config = {**server_config, **product_config}
 
     fetcher = RadarFetch(config)
-    fetcher.refresh()
+    try:
+        await fetcher.refresh()
+    except ClientConnectorError:
+        (_, exception, _) = exc_info()
+        inner_exception = exception.os_error
+        if isinstance(inner_exception, gaierror) and "Temporary" in str(inner_exception):
+            return
+        if isinstance(inner_exception, OSError) \
+                and "Network is unreachable" in str(inner_exception):
+            return
+        raise
     fetcher.make_video()
+
+def main() -> None:
+    """
+    Main method of command line-program.  Creates event loop and then runs amain() in it
+
+    :return: nothing
+    """
+    loop = get_event_loop()
+    loop.run_until_complete(amain())
 
 if __name__ == '__main__':
     main()

@@ -12,7 +12,7 @@ from typing import Dict
 
 import imageio
 import numpy as np
-import requests
+from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from jinja2 import Environment, PackageLoader, select_autoescape
 
@@ -41,6 +41,29 @@ def parse_duration(duration):
     unit = match[2]
     return datetime.timedelta(**{unit: amount})
 
+async def afetch(session: ClientSession, url: str):
+    """
+    Asynchronous fetch.  Do a GET request,  return text,  properly  shutdown
+
+    :param session: ClientSession object for aiohttp connection
+    :param url: The URL we want
+    :return:
+    """
+    async with session.get(url) as response:
+        return await response.text()
+
+async def bfetch(session: ClientSession, url: str):
+    """
+    Asynchronous binary fetch.  Do a GET request,  return binary data,  properly  shutdown
+
+    :param session: ClientSession object for aiohttp connection
+    :param url: The URL we want
+    :return:
+    """
+    async with session.get(url) as response:
+        response.raise_for_status()
+        return await response.read()
+
 class NoVideoFrames(ValueError):
     pass
 
@@ -54,7 +77,6 @@ class RadarFetch:
            generate.  This is not the general 'tentacruel' configuration dictionary.
 
         """
-        self._session = requests.Session()
         self._source_base = config["paths"]["source_base"]
         self._cache = Path.home() / "radar"
         self._patterns = config["products"]
@@ -71,13 +93,14 @@ class RadarFetch:
         index_out = self._output / destination
         index_out.write_text(template.render(**kwargs), encoding="utf-8")
 
-    def refresh(self):
-        self._session = requests.Session()
-        for pattern in self._patterns:
-            self._refresh(pattern)
+    async def refresh(self):
+        async with ClientSession() as session:
+            for pattern in self._patterns:
+                await self._refresh(session, pattern)
 
-    def _refresh(self, pattern: dict):
-        self._fetch_overlays(pattern)
+    async def _refresh(self, session, pattern: dict):
+        # pylint: disable = too-many-locals
+        await self._fetch_overlays(session, pattern)
         product_dir = "/".join(pattern["pattern"].split("/")[:-1])
         regex = re.compile(pattern["pattern"].split("/")[-1])
         target_dir = self._cache / product_dir
@@ -85,7 +108,7 @@ class RadarFetch:
 
         url_directory = self._source_base + product_dir + "/"
         LOGGER.debug("Checking %s", url_directory)
-        target = self._session.get(url_directory).text
+        target = await afetch(session, url_directory)
         soup = BeautifulSoup(target, features="lxml")
         links = soup.find_all("a")
         crawl = []
@@ -97,28 +120,27 @@ class RadarFetch:
         for href in crawl:
             target_file = self._cache / product_dir / href
             source_url = url_directory + href
-            self._fetch_file(source_url, target_file)
+            await self._fetch_file(session, source_url, target_file)
 
-    def _fetch_overlays(self, pattern: dict):
+    async def _fetch_overlays(self, session, pattern: dict):
         if "overlays" in pattern:
             for overlay in pattern["overlays"]:
                 source_url = self._source_base + overlay
                 target_file = self._cache / overlay
-                self._fetch_file(source_url, target_file)
+                await self._fetch_file(session, source_url, target_file)
 
 
-    def _fetch_file(self, source_url, target_file: Path):
+    async def _fetch_file(self, session, source_url, target_file: Path):
         if target_file.exists():
             LOGGER.debug(
                 "File %s already exists -- no need to download %s",
                 target_file, source_url)
             return
 
-        gif_data = self._session.get(source_url)
-        if gif_data.ok and gif_data.content:
-            target_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(target_file, "wb") as that:
-                that.write(gif_data.content)
+        gif_data = await bfetch(session, source_url)
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(target_file, "wb") as that:
+            that.write(gif_data)
 
 
     def make_video(self):
