@@ -57,9 +57,11 @@ async def amain() -> None:
         inner_exception = exception.os_error
         if isinstance(inner_exception, gaierror) and "Temporary" in str(inner_exception):
             return
-        if isinstance(inner_exception, OSError) \
-                and "Network is unreachable" in str(inner_exception):
-            return
+        if isinstance(inner_exception, OSError):
+            if "Network is unreachable" in str(inner_exception):
+                return
+            if "Connect call failed" in str(inner_exception):
+                return
         raise
     fetcher.make_video()
 
