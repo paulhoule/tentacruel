@@ -12,7 +12,7 @@ from typing import Dict
 
 import imageio
 import numpy as np
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientResponseError
 from bs4 import BeautifulSoup
 from jinja2 import Environment, PackageLoader, select_autoescape
 
@@ -123,7 +123,15 @@ class RadarFetch:
         for href in crawl:
             target_file = self._cache / product_dir / href
             source_url = url_directory + href
-            await self._fetch_file(session, source_url, target_file)
+            try:
+                await self._fetch_file(session, source_url, target_file)
+            except ClientResponseError as response_error:
+
+                # 404 errors happen sporadically;  possibly the file got deleted on the server after
+                # we did a GET for the index.  Pretend that 404s didn't happen
+
+                if response_error.status != 404:
+                    raise
 
     async def _fetch_overlays(self, session, pattern: dict):
         if "overlays" in pattern:
@@ -147,13 +155,16 @@ class RadarFetch:
 
 
     def make_video(self):
+        arguments = {
+            "radar_id": "BGM"
+        }
         for pattern in self._patterns:
             try:
                 last_date = self._make_video(pattern)
                 self._make_still(pattern)
-                self.copy_template(pattern, last_date=last_date.isoformat())
+                self.copy_template(pattern, last_date=last_date.isoformat(), **arguments)
             except NoVideoFrames:
-                self.copy_template(pattern, failed=True)
+                self.copy_template(pattern, failed=True, **arguments)
 
 
     # pylint: disable=too-many-locals
