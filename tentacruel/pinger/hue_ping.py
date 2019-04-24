@@ -4,13 +4,15 @@ what state they are in.
 
 """
 import json
-from asyncio import get_event_loop, sleep
+from asyncio import sleep
 from pathlib import Path
 from typing import Dict, Any
-from uuid import UUID, uuid5
+from uuid import UUID, uuid5, uuid4
 
+from aio_pika import Exchange, Message
 from aiohttp import ClientSession
 from tentacruel import keep
+from tentacruel.pinger import iso_zulu_now
 
 HUE_NS = UUID('63b25700-662c-11e9-8c24-9eb6d06a70c5')
 
@@ -57,9 +59,10 @@ class HuePinger():
 
     """
 
-    def __init__(self):
+    def __init__(self, exchange: Exchange):
         self._hue = AsyncHue()
         self._last_state = {}
+        self.exchange = exchange
 
     async def __aenter__(self):
         return self
@@ -77,18 +80,20 @@ class HuePinger():
         for light in lights.values():
             light_uuid = uuid5(HUE_NS, light["uniqueid"])
             state = censor_state(light)
+            this_moment = iso_zulu_now()
             if light_uuid not in self._last_state:
                 for (attribute, value) in state.items():
-                    await self.update_state(light_uuid, attribute, value)
+                    await self.update_state(light_uuid, this_moment, attribute, value)
             else:
                 last_state = self._last_state[light_uuid]
                 for (attribute, value) in state.items():
                     if last_state[attribute] != value:
-                        await self.update_state(light_uuid, attribute, value)
+                        await self.update_state(light_uuid, this_moment, attribute, value)
 
             self._last_state[light_uuid] = state
 
-    async def update_state(self, device_id: UUID, attribute: str, value: Any) -> None:
+    async def update_state(self, device_id: UUID, this_moment: str, attribute: str, value: Any)\
+            -> None:
         """
         Update state of device
 
@@ -97,7 +102,27 @@ class HuePinger():
         :param value: value of attribute,  typically a JSON Scalar (number, string or boolean)
         :return: nothing
         """
-        print(f"{device_id}: {attribute} = {value}")
+
+        event = self.create_event_packet(device_id, this_moment, attribute, value)
+        message = Message(body=json.dumps(event).encode("ascii"))
+        await self.exchange.publish(message, routing_key=event["attribute"])
+
+    def create_event_packet(self, device_id, this_moment, attribute, value):
+        # pylint: disable=no-self-use
+        """
+        Create a smartthings-comparable event packet
+
+        """
+
+        event_id = uuid4()
+        event = {
+            "_key": str(event_id),
+            "deviceId": str(device_id),
+            "attribute": f"hue.{attribute}",
+            "value": value,
+            "eventTime": this_moment,
+        }
+        return event
 
 
 def censor_state(light: Dict[str, Any]):
@@ -107,27 +132,15 @@ def censor_state(light: Dict[str, Any]):
     :param light: light configuration and status information from Hue Bridge
     :return: a few selected fields
     """
-    return keep(light["state"], {"reachable", "on", "bri"})
+    return keep(light["state"], {"reachable", "on", "bri", "hue", "sat", "xy", "ct", "colormode"})
 
-async def amain() -> None:
+async def hue_loop(exchange: Exchange) -> None:
     """
     Asynchronous main method of command-line program.
 
     :return:
     """
-    async with HuePinger() as pinger:
+    async with HuePinger(exchange) as pinger:
         while True:
             await pinger.poll()
             await sleep(10)
-
-def main() -> None:
-    """
-    Main method of command line-program.  Creates event loop and then runs amain() in it
-
-    :return: nothing
-    """
-    loop = get_event_loop()
-    loop.run_until_complete(amain())
-
-if __name__ == '__main__':
-    main()

@@ -72,7 +72,7 @@ class Pinger:
     Implementation of the application that does periodic logging and pings.
 
     """
-    def __init__(self, retry_count=3):
+    def __init__(self, exchange: Exchange, retry_count=3):
         if "LOGGING_LEVEL" in environ:
             getLogger(None).setLevel(environ["LOGGING_LEVEL"])
 
@@ -81,19 +81,7 @@ class Pinger:
         self.adb = connect_to_adb(self.config)
         self.private_network_id = UUID(self.config["private_network_id"])
         self.retry_count = retry_count
-        self.connection: Connection = None
-        self.exchange: Exchange = None
-
-    async def setup(self):
-        """
-        Initialization that can only be completed in an async method
-        """
-        self.connection = await connect_robust(
-            loop=get_event_loop(),
-            **self.config["pika"]
-        )
-
-        self.exchange = await self.connect_to_exchange()
+        self.exchange: Exchange = exchange
 
     async def ping_all(self):
         """
@@ -101,11 +89,10 @@ class Pinger:
 
         :return: None
         """
-        await self.setup()
-        async with self.connection:
-            while True:
-                await self.ping_all_once()
-                await sleep(60)
+
+        while True:
+            await self.ping_all_once()
+            await sleep(60)
 
     async def ping_all_once(self):
         """
@@ -141,15 +128,6 @@ class Pinger:
         for event in events:
             message = Message(body=json.dumps(event).encode("ascii"))
             await self.exchange.publish(message, routing_key=event["attribute"])
-
-    async def connect_to_exchange(self):
-        """
-        Connect to exchange
-        :return: AQMP exchange
-        """
-        channel = await self.connection.channel()
-        exchange = await channel.declare_exchange("smartthings", ExchangeType.FANOUT)
-        return exchange
 
     async def create_event_packet(self, host, this_moment, visible):
         """
