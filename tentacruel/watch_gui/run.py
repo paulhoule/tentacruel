@@ -15,6 +15,7 @@ from uuid import uuid4
 
 import pytz
 from aio_pika import connect_robust, Connection, ExchangeType
+from arango.database import Database
 from tentacruel.config import get_config, connect_to_adb
 from tentacruel.gui import ManagedGridFrame, run_tk
 
@@ -39,11 +40,11 @@ def local_from_iso_zulu(that: str) -> datetime.datetime:
     utc_time = raw_time.replace(tzinfo=datetime.timezone.utc)
     return utc_time.astimezone(EST)
 
-def extract_sensor_list(config: Dict[str, Any]):
+def extract_sensor_list(adb: Database):
     """
     Find sensors in configuration file and return them as a list
 
-    :param config: configuration megadictionary
+    :param config: arangodb database
     :return: a list of dicts that look like::
 
         {
@@ -53,15 +54,12 @@ def extract_sensor_list(config: Dict[str, Any]):
 
         defining what sensors to show in GUI.
     """
-    zones = config["zones"]
-    sensors = []
-    for zone in zones:
-        if "sensors" in zone:
-            for (sensor_id, name) in zone["sensors"].items():
-                sensors.append({
-                    "sensor_id": sensor_id,
-                    "name": name
-                })
+    aql_query = """
+    for row in names
+        return {"name": row._key ,"sensor_id": row.deviceId}
+    """
+
+    sensors = list(adb.aql.execute(aql_query))
     return sensors
 
 
@@ -97,10 +95,10 @@ class Application(ManagedGridFrame):
         self.alive = True
         self._pika_config = config["pika"]
         self.pika: Connection = None
-        self.adb = connect_to_adb(config)
+        self.adb: Database = connect_to_adb(config)
         self.attributes = attributes
 
-        sensors = extract_sensor_list(config)
+        sensors = extract_sensor_list(self.adb)
         self.sensor_by_key = {}
         for sensor in sensors:
             self.sensor_by_key[sensor["sensor_id"]] = sensor
