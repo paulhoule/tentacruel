@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List
 
 import yaml
-from tentacruel.watch_gui.run import extract_sensor_list
+from tentacruel.watch_gui import extract_sensor_list
 
 
 def test_extract_sensor_list():

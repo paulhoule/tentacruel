@@ -4,7 +4,6 @@ GUI application to watch system status.
 
 """
 
-import datetime
 from asyncio import run, get_event_loop, create_task
 from logging import getLogger, StreamHandler, DEBUG
 from os import environ
@@ -13,55 +12,14 @@ from typing import Any, Dict, List
 import json
 from uuid import uuid4
 
-import pytz
 from aio_pika import connect_robust, Connection, ExchangeType
 from arango.database import Database
 from tentacruel.config import get_config, connect_to_adb
 from tentacruel.gui import ManagedGridFrame, run_tk
+from tentacruel.watch_gui import local_from_iso_zulu, extract_sensor_list
 
 QUIT_BUTTON = "quit_button"
 LOGGER = getLogger(__name__)
-EST = pytz.timezone("US/Eastern")
-
-def local_from_iso_zulu(that: str) -> datetime.datetime:
-    """
-    Convert an ISO formatted datetime in string form to a
-    datetime.datetime object zoned to the local timezone
-
-    :param that: e.g. ''"2019-04-15T17:45:16"''
-    :return: e.g::
-       datetime.datetime(2019, 4, 15, 14, 24, 49,
-          tzinfo=<DstTzInfo 'US/Eastern' EDT-1 day, 20:00:00 DST>)
-
-    from above input in US/Eastern.
-    """
-
-    raw_time = datetime.datetime.fromisoformat(that.replace("Z", ""))
-    utc_time = raw_time.replace(tzinfo=datetime.timezone.utc)
-    return utc_time.astimezone(EST)
-
-def extract_sensor_list(adb: Database):
-    """
-    Find sensors in configuration file and return them as a list
-
-    :param config: arangodb database
-    :return: a list of dicts that look like::
-
-        {
-            "sensor_id": "a20bab2e-a7d0-4c93-8723-27a7bf3299b6",
-            "name": "inner-doghouse"
-        }
-
-        defining what sensors to show in GUI.
-    """
-    aql_query = """
-    for row in names
-        return {"name": row._key ,"sensor_id": row.deviceId}
-    """
-
-    sensors = list(adb.aql.execute(aql_query))
-    return sensors
-
 
 # pylint: disable=too-many-ancestors
 # pylint: disable=too-many-instance-attributes
@@ -155,13 +113,16 @@ class Application(ManagedGridFrame):
         :return:
         """
         aql_query = """
-        for row in attributes
-            let attributes = row.motion
-            filter attributes
-            return merge(attributes, {"attribute": "motion","deviceId": row._key})
+            for row in attributes
+                filter row._key IN @devices
+                for attribute in attributes(row)
+                   filter left(attribute,1) != "_"
+                   return merge(row[attribute],{"attribute": attribute,"deviceId": row._key})
         """
-
-        current_status = list(self.adb.aql.execute(aql_query))
+        bind_vars = {
+            "devices": list(self.sensor_by_key.keys())
+        }
+        current_status = list(self.adb.aql.execute(aql_query, bind_vars=bind_vars))
         for event in current_status:
             event = await self.enrich_event(event)
             await self.handle_event(event)
@@ -247,12 +208,15 @@ class Application(ManagedGridFrame):
         :return:
         """
         device_id = event["deviceId"]
-        if event["attribute"] == "motion":
+        if event["attribute"] in self.attributes:
             if device_id in self.sensor_by_key:
-                label = self[device_id+"-a-"+event["attribute"]]
-                options = self.label_states[event["value"]]
-                for (option_name, option_value) in options.items():
-                    label[option_name] = option_value
+                label = self[device_id + "-a-" + event["attribute"]]
+                if event["attribute"] == "motion":
+                    options = self.label_states[event["value"]]
+                    for (option_name, option_value) in options.items():
+                        label[option_name] = option_value
+                else:
+                    label["text"] = event["value"]
 
                 if self.has_since:
                     since = self[device_id + "-since"]
@@ -270,7 +234,15 @@ async def amain() -> None:
     :return:
     """
     config = get_config()
-    app = Application(config, ["motion"])
+    attributes = [
+        "acceleration",
+        "humidity",
+        "illuminance",
+        "motion",
+        "temperature",
+        "battery"
+    ]
+    app = Application(config, attributes)
     await app.setup()
     await run_tk(app)
 

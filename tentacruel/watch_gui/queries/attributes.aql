@@ -1,0 +1,4 @@
+for event in sqs_events
+   filter event.deviceId == "bf423230-3495-4375-8033-60b4f7d3455c"
+   collect attribute = event.attribute
+   return attribute
