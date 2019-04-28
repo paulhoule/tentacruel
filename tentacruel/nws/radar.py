@@ -12,7 +12,7 @@ from sys import exc_info
 
 
 from aiohttp import ClientConnectorError
-from tentacruel.config import get_config
+from tentacruel.config import get_config, connect_to_adb
 from tentacruel.nws import RadarFetch, register
 
 from _socket import gaierror
@@ -48,8 +48,9 @@ async def amain() -> None:
     server_config = get_config("wx-paths.yaml")
     product_config = get_config("radar_config.yaml", package="tentacruel.nws")
     config = {**server_config, **product_config}
+    adb = connect_to_adb(get_config())
 
-    fetcher = RadarFetch(config)
+    fetcher = RadarFetch(config, adb)
     try:
         await fetcher.refresh()
     except ClientConnectorError:

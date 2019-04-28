@@ -13,8 +13,10 @@ from typing import Dict
 import imageio
 import numpy as np
 from aiohttp import ClientSession, ClientResponseError
+from arango.database import Database
 from bs4 import BeautifulSoup
 from jinja2 import Environment, PackageLoader, select_autoescape
+from metar.Metar import Metar
 
 JINJA = Environment(
     loader=PackageLoader('tentacruel.nws', 'jj2'),
@@ -31,6 +33,10 @@ DATE_FUNCTIONS = {}
 def register(function):
     DATE_FUNCTIONS[function.__name__] = function
     return function
+
+def wind_alpha(angle: float):
+    octant = int((angle + 22.5)/ 45.0)
+    return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][octant]
 
 RE_DURATION = re.compile(r"(\d+) (days|seconds|microseconds|milliseconds|minutes|hours|weeks)")
 def parse_duration(duration):
@@ -71,7 +77,7 @@ class NoVideoFrames(ValueError):
     pass
 
 class RadarFetch:
-    def __init__(self, config: Dict):
+    def __init__(self, config: Dict, adb: Database):
         """
 
         :param config:
@@ -84,6 +90,16 @@ class RadarFetch:
         self._cache = Path.home() / "radar"
         self._patterns = config["products"]
         self._output = Path(config["paths"]["output"])
+        self._adb = adb
+
+    def fetch_wx(self):
+        cursor = self._adb.aql.execute("""
+        for row in metar
+          sort row.time desc
+          limit 1
+          return row
+        """)
+        return next(cursor)
 
     def copy_template(self, pattern, failed=False, **kwargs):
         if failed:
@@ -155,9 +171,26 @@ class RadarFetch:
 
 
     def make_video(self):
+        latest_wx = self.fetch_wx() # pylint: disable = invalid-name
+        parsed_wx = Metar(latest_wx["code"])
+        present_weather = parsed_wx.present_weather()
+        if not present_weather:
+            present_weather = "no precipitation"
         arguments = {
-            "radar_id": "BGM"
+            "radar_id": "BGM",
+            "wx_time": latest_wx["time"],
+            "location": "Ithaca Airport",
+            "temp": latest_wx["temp"],
+            "dewpt": latest_wx["dewpt"],
+            "humidity": round(latest_wx["humidity"]*10)/10.0,
+            "wind_speed": round(latest_wx["wind_speed"]*10)/10.0,
+            "wind_alpha": wind_alpha(latest_wx["wind_dir"]),
+            "wind_dir": latest_wx["wind_dir"],
+            "pressure": latest_wx["pressure"],
+            "sky": latest_wx["sky"],
+            "present_weather": present_weather
         }
+
         for pattern in self._patterns:
             try:
                 last_date = self._make_video(pattern)

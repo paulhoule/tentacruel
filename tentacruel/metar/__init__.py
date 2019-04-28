@@ -52,7 +52,7 @@ def internal_metar(metar_text: str) -> Dict[str, Any]:
     Convert the output of the Metar parser into a dictionary which could be
     queried in a document database
 
-    :param metar_text: N
+    :param metar_text: metar string
     :return: a Dict with decoded METAR information
     """
     document = {}
