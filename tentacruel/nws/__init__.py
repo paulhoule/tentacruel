@@ -36,7 +36,7 @@ def register(function):
 
 def wind_alpha(angle: float):
     octant = int((angle + 22.5)/ 45.0)
-    return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][octant]
+    return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][octant % 8]
 
 RE_DURATION = re.compile(r"(\d+) (days|seconds|microseconds|milliseconds|minutes|hours|weeks)")
 def parse_duration(duration):

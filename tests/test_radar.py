@@ -47,11 +47,13 @@ def test_wind():
     assert(wind_alpha(90) == "E")
     assert(wind_alpha(180) == "S")
     assert(wind_alpha(270) == "W")
+    assert(wind_alpha(360) == "N")
 
     assert(wind_alpha(45) == "NE")
     assert(wind_alpha(135) == "SE")
     assert(wind_alpha(225) == "SW")
     assert(wind_alpha(315) == "NW")
+
 
     assert(wind_alpha(10) == "N")
     assert(wind_alpha(20) == "N")
@@ -64,7 +66,3 @@ def test_wind():
     assert(wind_alpha(100) == "E")
     assert(wind_alpha(110) == "E")
     assert(wind_alpha(120) == "SE")
-
-if __name__ == "__main__":
-    import pytest
-    pytest.main()
