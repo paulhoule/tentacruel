@@ -35,6 +35,9 @@ def register(function):
     return function
 
 def wind_alpha(angle: float):
+    if angle is None:
+        return "variable"
+
     octant = int((angle + 22.5)/ 45.0)
     return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][octant % 8]
 
@@ -186,8 +189,8 @@ class RadarFetch:
                 "dewpt": latest_wx["dewpt"],
                 "humidity": latest_wx["humidity"],
                 "wind_speed": latest_wx["wind_speed"],
-                "wind_alpha": wind_alpha(latest_wx["wind_dir"]),
-                "wind_dir": latest_wx["wind_dir"],
+                "wind_alpha": wind_alpha(latest_wx.get("wind_dir")),
+                "wind_dir": latest_wx.get("wind_dir"),
                 "pressure": latest_wx["pressure"],
                 "sky": latest_wx["sky"],
                 "present_weather": present_weather

@@ -19,7 +19,11 @@
         <br>
         Temperature: {{ wx.temp|round(1) }} &deg;F  Dewpoint: {{ wx.dewpt|round(1) }} &deg;F
         Relative Humidity: {{ wx.humidity|round(1) }}%<br>
-        Wind:  {{ wx.wind_alpha }} ({{ wx.wind_dir }}&deg) {{ wx.wind_speed|round(1) }} mph
+        Wind:  {{ wx.wind_alpha }}
+        {% if not wx.wind_dir is none %}
+            ({{ wx.wind_dir }}&deg)
+        {% endif %}
+        {{ wx.wind_speed|round(1) }} mph
         Pressure: {{ wx.pressure|round(1) }} mbar<br>
         {{ wx.sky }} ; {{ wx.present_weather }}
     </div>
