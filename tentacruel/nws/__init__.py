@@ -176,19 +176,22 @@ class RadarFetch:
         present_weather = parsed_wx.present_weather()
         if not present_weather:
             present_weather = "no precipitation"
+
         arguments = {
             "radar_id": "BGM",
-            "wx_time": latest_wx["time"],
-            "location": "Ithaca Airport",
-            "temp": latest_wx["temp"],
-            "dewpt": latest_wx["dewpt"],
-            "humidity": round(latest_wx["humidity"]*10)/10.0,
-            "wind_speed": round(latest_wx["wind_speed"]*10)/10.0,
-            "wind_alpha": wind_alpha(latest_wx["wind_dir"]),
-            "wind_dir": latest_wx["wind_dir"],
-            "pressure": latest_wx["pressure"],
-            "sky": latest_wx["sky"],
-            "present_weather": present_weather
+            "latest_wx": {
+                "wx_time": latest_wx["time"],
+                "location": "Ithaca Airport",
+                "temp": latest_wx["temp"],
+                "dewpt": latest_wx["dewpt"],
+                "humidity": latest_wx["humidity"],
+                "wind_speed": latest_wx["wind_speed"],
+                "wind_alpha": wind_alpha(latest_wx["wind_dir"]),
+                "wind_dir": latest_wx["wind_dir"],
+                "pressure": latest_wx["pressure"],
+                "sky": latest_wx["sky"],
+                "present_weather": present_weather
+            }
         }
 
         for pattern in self._patterns:

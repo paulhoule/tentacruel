@@ -1,0 +1,26 @@
+{% macro radar_age(last_date) %}
+    <script>
+        last_date = Date.parse("{{ last_date }}")
+        seconds = (Date.now()-last_date)/1000
+        minutes = Math.floor(seconds/60)
+        document.write("latest radar image captured "+minutes+" minutes ago")
+    </script>
+{% endmacro %}
+
+{% macro metar(wx) %}
+    <h1>Latest weather at {{ wx.location }}</h1>
+    <div class="navbar">
+         <script>
+            last_date = Date.parse("{{ wx.wx_time }}")
+            seconds = (Date.now()-last_date)/1000
+            minutes = Math.floor(seconds/60)
+            document.write("weather observed "+minutes+" minutes ago")
+        </script>
+        <br>
+        Temperature: {{ wx.temp|round(1) }} &deg;F  Dewpoint: {{ wx.dewpt|round(1) }} &deg;F
+        Relative Humidity: {{ wx.humidity|round(1) }}%<br>
+        Wind:  {{ wx.wind_alpha }} ({{ wx.wind_dir }}&deg) {{ wx.wind_speed|round(1) }} mph
+        Pressure: {{ wx.pressure|round(1) }} mbar<br>
+        {{ wx.sky }} ; {{ wx.present_weather }}
+    </div>
+{% endmacro %}

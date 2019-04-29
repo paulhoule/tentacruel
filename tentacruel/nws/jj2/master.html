@@ -1,0 +1,28 @@
+{% import 'macros.html' as macros %}
+<html>
+    <head>
+        <title>Weather at 472 Central</title>
+        <style>
+            BODY { background: black; color: white }
+            h1 { text-align: center; color: white}
+            .navbar { width: 1250px; margin: auto; text-align: center}
+            .pred1hr { display: flex; width: 1250px; margin: auto}
+            figcaption { font-weight: bold}
+        </style>
+        <meta http-equiv="refresh" content="120">
+    </head>
+    <body>
+        {{ macros.metar(latest_wx) }}
+        <h1>{% block header %}{% endblock %}</h1>
+        <div class="navbar">
+            {% block navbar %}
+            {% endblock %}
+            <br>
+            {{ macros.radar_age(last_date) }}
+        </div>
+        <div class="pred1hr">
+            {% block radar %}
+            {% endblock %}
+        </div>
+    </body>
+</html>

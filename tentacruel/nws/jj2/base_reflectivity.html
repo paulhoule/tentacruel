@@ -1,39 +1,20 @@
-<html>
-    <head>
-        <title>Weather at 472 Central: Base Reflectivity</title>
-        <style>
-            BODY { background: black; color: white }
-            h1 { text-align: center; color: white}
-            .navbar { width: 1250px; margin: auto; text-align: center}
-            .pred1hr { display: flex; width: 1250px; margin: auto}
-            figcaption { font-weight: bold}
-        </style>
-        <meta http-equiv="refresh" content="120">
-    </head>
-    <body>
-        <h1>Base Reflectivity</h1>
-        <div class="navbar">
+{% extends "master.html" %}
+{% block header %}
+Base Reflectivity
+{% endblock %}
+{% block navbar %}
             <a href=".">Precipitation Prediction</a> |
             <a href="northeast.html">Northeast Regional</a><br>
-            <script>
-                last_date = Date.parse("{{ last_date }}")
-                seconds = (Date.now()-last_date)/1000
-                minutes = Math.floor(seconds/60)
-                document.write("latest radar image captured "+minutes+" minutes ago")
-            </script>
-        </div>
-
-        <div class="pred1hr">
-            <figure class="latest">
-                <figcaption>latest image</figcaption>
-                <img src="N0R{{ radar_id }}.png">
-            </figure>
-            <figure class="recent">
-                <figcaption>recent video (last two hours)</figcaption>
-                <video autoplay loop>
-                    <source src="N0R{{ radar_id }}.mp4" type="video/mp4">
-                </video>
-            </figure>
-        </div>
-    </body>
-</html>
+{% endblock %}
+{% block radar %}
+    <figure class="latest">
+        <figcaption>latest image</figcaption>
+        <img src="N0R{{ radar_id }}.png">
+    </figure>
+    <figure class="recent">
+        <figcaption>recent video (last two hours)</figcaption>
+        <video autoplay loop>
+            <source src="N0R{{ radar_id }}.mp4" type="video/mp4">
+        </video>
+    </figure>
+{% endblock %}
