@@ -7,7 +7,8 @@ GUI application to watch system status.
 from asyncio import run, get_event_loop, create_task
 from logging import getLogger, StreamHandler, DEBUG
 from os import environ
-from tkinter import Button, Label
+from tkinter import Label
+from tkinter.font import Font
 from typing import Any, Dict, List
 import json
 from uuid import uuid4
@@ -18,7 +19,6 @@ from tentacruel.config import get_config, connect_to_adb
 from tentacruel.gui import ManagedGridFrame, run_tk
 from tentacruel.watch_gui import local_from_iso_zulu, extract_sensor_list
 
-QUIT_BUTTON = "quit_button"
 LOGGER = getLogger(__name__)
 
 # pylint: disable=too-many-ancestors
@@ -56,6 +56,13 @@ class Application(ManagedGridFrame):
         self.adb: Database = connect_to_adb(config)
         self.attributes = attributes
 
+        BOLD = Font(weight="bold") # pylint: disable=invalid-name
+        self._add("header-label", Label, text="label", font=BOLD)
+        for attribute in attributes:
+            self._add("header-a-" + attribute, Label, text=attribute, font=BOLD)
+        if len(attributes) == 1:
+            self._add("header-since", Label, text="since", font=BOLD)
+
         sensors = extract_sensor_list(self.adb)
         self.sensor_by_key = {}
         for sensor in sensors:
@@ -65,8 +72,6 @@ class Application(ManagedGridFrame):
                 self._add(sensor["sensor_id"] + "-a-" + attribute, Label, text="Unknown")
             if len(attributes) == 1:
                 self._add(sensor["sensor_id"] + "-since", Label, text=" "*8)
-
-        self._add(QUIT_BUTTON, Button, text="Quit", width=15, height=1, columnspan=1)
 
         self.label_states = {
             "active": {
@@ -235,11 +240,10 @@ async def amain() -> None:
     """
     config = get_config()
     attributes = [
-        "acceleration",
+        "temperature",
         "humidity",
         "illuminance",
         "motion",
-        "temperature",
         "battery"
     ]
     app = Application(config, attributes)
