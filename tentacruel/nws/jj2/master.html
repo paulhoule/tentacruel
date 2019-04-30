@@ -17,12 +17,20 @@
         <div class="navbar">
             {% block navbar %}
             {% endblock %}
-            <br>
-            {{ macros.radar_age(last_date) }}
-        </div>
-        <div class="pred1hr">
-            {% block radar %}
-            {% endblock %}
-        </div>
+
+            {% if failed %}
+                <h1>No current radar images available from NWS</h1>
+                <div class="navbar">
+                    Check <a href="{{ radar_html }}}">NWS product page.</a>
+                </div>
+            {% else %}
+                <div class="navbar">
+                    {{ macros.radar_age(last_date) }}
+                </div>
+                <div class="pred1hr">
+                    {% block radar %}{% endblock %}
+                </div>
+            {% endif %}
+
     </body>
 </html>

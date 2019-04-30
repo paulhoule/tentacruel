@@ -105,12 +105,12 @@ class RadarFetch:
         return next(cursor)
 
     def copy_template(self, pattern, failed=False, **kwargs):
-        if failed:
-            template_name = "failed.html"
-        else:
-            template_name = pattern["template"]
-
+        template_name = pattern["template"]
         destination = pattern["template"]
+        kwargs["failed"] = failed
+        if kwargs.get("failed"):
+            kwargs["radar_html"] = pattern["radar_html"]
+
         template = JINJA.get_template(template_name)
         index_out = self._output / destination
         index_out.write_text(template.render(**kwargs), encoding="utf-8")

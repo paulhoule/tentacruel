@@ -16,6 +16,7 @@ products:
     window: 2 hours
     retain: 2 weeks
     template: base_reflectivity.html
+    radar_html: https://radar.weather.gov/radar.php?rid=bgm&product=N0R&overlay=11101111&loop=no
   - pattern: ridge/RadarImg/N1P/BGM/BGM_[0-9]{8}_[0-9]{4}_N1P.gif
     date_fn: radar_file_date
     video: N1PBGM.mp4
@@ -28,6 +29,7 @@ products:
     window: 2 hours
     retain: 2 weeks
     template: index.html
+    radar_html: https://radar.weather.gov/radar.php?rid=bgm&product=N0R&overlay=11101111&loop=no
   - pattern: Conus/RadarImg/northeast_[0-9]{8}_[0-9]{4}.gif
     date_fn: radar_file_date
     still: northeast.png
@@ -35,3 +37,4 @@ products:
     window: 6 hours
     retain: 2 weeks
     template: northeast.html
+    radar_html: https://radar.weather.gov/Conus/northeast.php
