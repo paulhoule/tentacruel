@@ -71,7 +71,12 @@ async def bfetch(session: ClientSession, url: str):
     """
     async with session.get(url) as response:
         if response.status >= 400:
-            LOGGER.error("Got status %s for GET %s", response.status, url)
+            #
+            # 404 errors appear to happen regularly.  I don't want these resulting in a
+            # cron job email,  so I suppress the log message.
+            #
+            action = LOGGER.debug if response.status == 404 else LOGGER.error
+            action("Got status %s for GET %s", response.status, url)
 
         response.raise_for_status()
         return await response.read()
