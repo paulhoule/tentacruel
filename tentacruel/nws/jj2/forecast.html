@@ -1,0 +1,14 @@
+{% extends "master.html" %}
+{% block header %}
+Current Forecast
+{% endblock %}
+{% block navbar %}
+    <a href="base_reflectivity.html">Base Reflectivity</a> |
+    <a href="northeast.html">Northeast Regional</a>
+{% endblock %}
+{% block radar %}
+    <figure class="motd">
+        <figcaption>Message of the Day</figcaption>
+        <img src="motd.jpg">
+    </figure>
+{% endblock %}

@@ -65,6 +65,7 @@ async def amain() -> None:
                 return
         raise
     fetcher.make_video()
+    fetcher.make_forecast()
 
 def main() -> None:
     """

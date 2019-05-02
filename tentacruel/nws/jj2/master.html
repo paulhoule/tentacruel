@@ -7,6 +7,7 @@
             h1 { text-align: center; color: white}
             .navbar { width: 1250px; margin: auto; text-align: center}
             .pred1hr { display: flex; width: 1250px; margin: auto}
+            .motd { margin: auto }
             figcaption { font-weight: bold}
         </style>
         <meta http-equiv="refresh" content="120">
@@ -24,9 +25,11 @@
                     Check <a href="{{ radar_html }}}">NWS product page.</a>
                 </div>
             {% else %}
+                {% if last_date %}
                 <div class="navbar">
                     {{ macros.radar_age(last_date) }}
                 </div>
+                {% endif %}
                 <div class="pred1hr">
                     {% block radar %}{% endblock %}
                 </div>

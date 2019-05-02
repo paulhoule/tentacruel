@@ -4,7 +4,12 @@ import datetime
 import os
 import re
 import sys
+from email.utils import parsedate_to_datetime
 from logging import getLogger, basicConfig
+from shutil import copyfile
+from uuid import uuid4
+from hashlib import sha384
+
 from math import floor
 from operator import itemgetter
 from pathlib import Path
@@ -29,6 +34,9 @@ LOGGER = getLogger(__package__)
 # to install ffmepg: imageio.plugins.ffmpeg.download()
 
 DATE_FUNCTIONS = {}
+
+def to_iso_z(when: datetime.datetime):
+    return when.isoformat().replace("+00:00", "Z")
 
 def register(function):
     DATE_FUNCTIONS[function.__name__] = function
@@ -60,6 +68,18 @@ async def afetch(session: ClientSession, url: str):
     """
     async with session.get(url) as response:
         return await response.text()
+
+async def ahead(session: ClientSession, url: str):
+    """
+    Asynchronous head request.
+
+    :param session: aiohttp ClientSession
+    :param url: The URL we want
+    :return:
+    """
+
+    async with session.head(url) as response:
+        return response.headers
 
 async def bfetch(session: ClientSession, url: str):
     """
@@ -99,6 +119,50 @@ class RadarFetch:
         self._patterns = config["products"]
         self._output = Path(config["paths"]["output"])
         self._adb = adb
+        self._resources = {}
+
+    async def fetch_motd(self, session: ClientSession):
+        url = "https://www.weather.gov/images/bgm/finalMOD.jpg"
+        target_dir = self._cache / "bgm" / "finalMod"
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        headers = await ahead(session, url)
+        last_modified = to_iso_z(parsedate_to_datetime(headers['Last-Modified']))
+        cursor = self._adb.aql.execute("""
+        for row in snapshots
+           filter row.url==@url
+           sort row.last_modified desc
+           limit 1
+           return row
+        """, bind_vars={"url": url})
+        try:
+            last = next(cursor)
+            if last["last_modified"] >= last_modified:
+                hexdigest = last["sha384"]
+                filename = target_dir / f"{hexdigest}.jpg"
+                observed = sha384(filename.read_bytes()).hexdigest()
+                if observed == hexdigest:
+                    return filename
+                LOGGER.error("Found file %s did not match expected SHA384 digest", filename)
+                filename.unlink()
+        except StopIteration:
+            pass
+
+        content = await bfetch(session, url)
+        print(f"content length is {len(content)}")
+        hexdigest = sha384(content).hexdigest()
+        self._adb.insert_document("snapshots", {
+            "_key": str(uuid4()),
+            "url": url,
+            "last_modified": last_modified,
+            "content_length": int(headers["Content-Length"]),
+            "sha384": hexdigest
+        })
+
+
+        filename = target_dir / f"{hexdigest}.jpg"
+        filename.write_bytes(content)
+        return filename
 
     def fetch_wx(self):
         cursor = self._adb.aql.execute("""
@@ -122,6 +186,7 @@ class RadarFetch:
 
     async def refresh(self):
         async with ClientSession() as session:
+            self._resources["motd"] = await self.fetch_motd(session)
             for pattern in self._patterns:
                 await self._refresh(session, pattern)
 
@@ -179,12 +244,27 @@ class RadarFetch:
 
 
     def make_video(self):
-        latest_wx = self.fetch_wx() # pylint: disable = invalid-name
+        arguments = self.wx_arguments()
+
+        for pattern in self._patterns:
+            try:
+                last_date = self._make_video(pattern)
+                self._make_still(pattern)
+                self.copy_template(pattern, last_date=last_date.isoformat(), **arguments)
+            except NoVideoFrames:
+                self.copy_template(pattern, failed=True, **arguments)
+
+    def wx_arguments(self):
+        """
+        Compute arguments to include in template to show current weather information
+
+        :return:
+        """
+        latest_wx = self.fetch_wx()  # pylint: disable = invalid-name
         parsed_wx = Metar(latest_wx["code"])
         present_weather = parsed_wx.present_weather()
         if not present_weather:
             present_weather = "no precipitation"
-
         arguments = {
             "radar_id": "BGM",
             "latest_wx": {
@@ -201,18 +281,11 @@ class RadarFetch:
                 "present_weather": present_weather
             }
         }
-
-        for pattern in self._patterns:
-            try:
-                last_date = self._make_video(pattern)
-                self._make_still(pattern)
-                self.copy_template(pattern, last_date=last_date.isoformat(), **arguments)
-            except NoVideoFrames:
-                self.copy_template(pattern, failed=True, **arguments)
-
+        return arguments
 
     # pylint: disable=too-many-locals
     # pylint: disable=too-many-statements
+    # pylint: disable=too-many-branches
     def _make_video(self, pattern):
         LOGGER.info("Creating video %s", pattern['video'])
         start = datetime.datetime.now()
@@ -253,6 +326,7 @@ class RadarFetch:
         overlays = self._merge_overlays(overlays)
 
         LOGGER.debug("Preparing to write movie to %s", movie_temp)
+        good_frames = 0
         with imageio.get_writer(
                 movie_temp,
                 mode='I', fps=10) as writer:
@@ -290,14 +364,18 @@ class RadarFetch:
                 cropped = content[-legal_width:, -legal_height:]
 
                 writer.append_data(cropped)
+                good_frames += 1
 
-        if not sys.platform.startswith('linux'):
-            if os.path.exists(movie_out):
-                os.unlink(movie_out)
-        os.rename(movie_temp, movie_out)
-        end = datetime.datetime.now()
-        LOGGER.info("Completed video %s in time %s", pattern['video'], end - start)
-        return date_fn(video_frames[-1]["path"].name)
+        if good_frames:
+            if not sys.platform.startswith('linux'):
+                if os.path.exists(movie_out):
+                    os.unlink(movie_out)
+            os.rename(movie_temp, movie_out)
+            end = datetime.datetime.now()
+            LOGGER.info("Completed video %s in time %s", pattern['video'], end - start)
+            return date_fn(video_frames[-1]["path"].name)
+
+        raise ValueError("Found no valid video frames to make movie")
 
     def _lookup_matching(self, pattern):
         product_dir = "/".join(pattern["pattern"].split("/")[:-1])
@@ -341,6 +419,15 @@ class RadarFetch:
         for overlay in overlays:
             content = fast_composite(content, overlay)
         return content[0].astype(np.uint8)
+
+    def make_forecast(self):
+        arguments = self.wx_arguments()
+        motd = self._resources["motd"]
+        copyfile(motd, self._output / "motd.jpg")
+        pattern = {
+            "template" : "forecast.html"
+        }
+        self.copy_template(pattern, motd=motd, **arguments)
 
 def load_masked_image(path):
     img = imageio.imread(path)
