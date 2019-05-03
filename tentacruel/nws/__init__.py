@@ -149,8 +149,10 @@ class RadarFetch:
             pass
 
         content = await bfetch(session, url)
-        print(f"content length is {len(content)}")
+        LOGGER.debug("Downloaded %d bytes from url %s", len(content), url)
         hexdigest = sha384(content).hexdigest()
+        LOGGER.debug("SHA384 digest: %s")
+
         self._adb.insert_document("snapshots", {
             "_key": str(uuid4()),
             "url": url,
