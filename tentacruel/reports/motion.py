@@ -3,10 +3,10 @@
 
 from pathlib import Path
 from collections import Counter
-import datetime
 
 import pytz
 import yaml
+from tentacruel.time import from_zulu_string
 
 with open(Path.home() / ".tentacruel" / "config.yaml") as a_stream:
     config = yaml.load(a_stream)
@@ -31,8 +31,7 @@ def map_it(that):
     result = {}
     result["deviceId"] = that["deviceId"]
     result["value"] = that["value"]
-    event_zulu = datetime.datetime.fromisoformat(that["eventTime"].replace("Z", ""))\
-        .replace(tzinfo=datetime.timezone.utc)
+    event_zulu = from_zulu_string(result["eventTime"])
     EST = pytz.timezone("US/Eastern")
     result["eventTime"] = event_zulu.astimezone(EST)
 

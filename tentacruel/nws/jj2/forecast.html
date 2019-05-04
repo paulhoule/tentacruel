@@ -8,6 +8,11 @@ Current Forecast
 {% endblock %}
 {% block radar %}
     <figure class="motd">
+        {{ macros.draw_forecast(forecast.properties.periods[0]) }}
+        <br>
+        {{ macros.draw_forecast(forecast.properties.periods[1]) }}
+        <br>
+        {{ macros.draw_forecast(forecast.properties.periods[2]) }}
         <figcaption>Message of the Day</figcaption>
         <img src="motd.jpg">
     </figure>

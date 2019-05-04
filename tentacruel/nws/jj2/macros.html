@@ -28,3 +28,7 @@
         {{ wx.sky }} ; {{ wx.present_weather }}
     </div>
 {% endmacro %}
+
+{% macro draw_forecast(period) %}
+<b>{{ period.name }}</b>: {{ period.detailedForecast }}
+{% endmacro %}

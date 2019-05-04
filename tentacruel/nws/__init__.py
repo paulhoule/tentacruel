@@ -1,13 +1,14 @@
 # pylint: disable=missing-docstring
 import datetime
+import json
 
 import os
 import re
 import sys
 from email.utils import parsedate_to_datetime
-from logging import getLogger, basicConfig
+from logging import getLogger
 from shutil import copyfile
-from uuid import uuid4
+from uuid import uuid4, NAMESPACE_URL, uuid5
 from hashlib import sha384
 
 from math import floor
@@ -17,11 +18,12 @@ from typing import Dict
 
 import imageio
 import numpy as np
-from aiohttp import ClientSession, ClientResponseError
+from aiohttp import ClientSession, ClientResponseError, ClientError
 from arango.database import Database
 from bs4 import BeautifulSoup
 from jinja2 import Environment, PackageLoader, select_autoescape
 from metar.Metar import Metar
+from tentacruel.time import from_zulu_string, to_zulu_string, utcnow
 
 JINJA = Environment(
     loader=PackageLoader('tentacruel.nws', 'jj2'),
@@ -34,9 +36,6 @@ LOGGER = getLogger(__package__)
 # to install ffmepg: imageio.plugins.ffmpeg.download()
 
 DATE_FUNCTIONS = {}
-
-def to_iso_z(when: datetime.datetime):
-    return when.isoformat().replace("+00:00", "Z")
 
 def register(function):
     DATE_FUNCTIONS[function.__name__] = function
@@ -67,7 +66,7 @@ async def afetch(session: ClientSession, url: str):
     :return:
     """
     async with session.get(url) as response:
-        return await response.text()
+        return (await response.text(), response.headers)
 
 async def ahead(session: ClientSession, url: str):
     """
@@ -121,13 +120,49 @@ class RadarFetch:
         self._adb = adb
         self._resources = {}
 
+    async def fetch_forecast_text(self, session: ClientSession):
+        url = "https://api.weather.gov/gridpoints/BGM/47,66/forecast"
+        _key = str(uuid5(NAMESPACE_URL, url))
+        cache = self._adb.collection("cache")
+        cached = cache.get(_key)
+        if cached:
+            old_expires = from_zulu_string(cached["expires"])
+            if old_expires > utcnow():
+                LOGGER.debug("Fetched url %s out of arangodb", url)
+                return cached["content"]
+
+        try:
+            (content, headers) = await afetch(session, url)
+        except ClientError:
+            LOGGER.error("Attempt to fetch url %s failed", url)
+            if cached:
+                LOGGER.error("Falling back on cached content from arangodb for url %s", url)
+                return cached["content"]
+            LOGGER.error("Could not find url %s in cache", url)
+            raise
+
+        result = json.loads(content)
+        if "expires" in headers:
+            expires = parsedate_to_datetime(headers["expires"])
+            document = {
+                "_key": _key,
+                "url": url,
+                "expires": to_zulu_string(expires),
+                "content": result
+            }
+            self._adb.aql.execute("""
+                UPSERT {_key: @key} INSERT @document REPLACE @document IN cache"
+            """, bind_vars={"key": _key, "document": document})
+
+        return result
+
     async def fetch_motd(self, session: ClientSession):
         url = "https://www.weather.gov/images/bgm/finalMOD.jpg"
         target_dir = self._cache / "bgm" / "finalMod"
         target_dir.mkdir(parents=True, exist_ok=True)
 
         headers = await ahead(session, url)
-        last_modified = to_iso_z(parsedate_to_datetime(headers['Last-Modified']))
+        last_modified = to_zulu_string(parsedate_to_datetime(headers['Last-Modified']))
         cursor = self._adb.aql.execute("""
         for row in snapshots
            filter row.url==@url
@@ -140,11 +175,14 @@ class RadarFetch:
             if last["last_modified"] >= last_modified:
                 hexdigest = last["sha384"]
                 filename = target_dir / f"{hexdigest}.jpg"
-                observed = sha384(filename.read_bytes()).hexdigest()
-                if observed == hexdigest:
-                    return filename
-                LOGGER.error("Found file %s did not match expected SHA384 digest", filename)
-                filename.unlink()
+                if filename.exists():
+                    observed = sha384(filename.read_bytes()).hexdigest()
+                    if observed == hexdigest:
+                        return filename
+                    LOGGER.error("Found file %s did not match expected SHA384 digest", filename)
+                    filename.unlink()
+                else:
+                    LOGGER.error("Didn't file %s although file was in database", filename)
         except StopIteration:
             pass
 
@@ -188,6 +226,7 @@ class RadarFetch:
 
     async def refresh(self):
         async with ClientSession() as session:
+            self._resources["forecast"] = await self.fetch_forecast_text(session)
             self._resources["motd"] = await self.fetch_motd(session)
             for pattern in self._patterns:
                 await self._refresh(session, pattern)
@@ -202,7 +241,7 @@ class RadarFetch:
 
         url_directory = self._source_base + product_dir + "/"
         LOGGER.debug("Checking %s", url_directory)
-        target = await afetch(session, url_directory)
+        (target, _) = await afetch(session, url_directory)
         soup = BeautifulSoup(target, features="lxml")
         links = soup.find_all("a")
         crawl = []
@@ -424,6 +463,7 @@ class RadarFetch:
 
     def make_forecast(self):
         arguments = self.wx_arguments()
+        arguments["forecast"] = self._resources["forecast"]
         motd = self._resources["motd"]
         copyfile(motd, self._output / "motd.jpg")
         pattern = {
