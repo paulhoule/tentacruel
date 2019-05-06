@@ -6,7 +6,13 @@
         document.write("latest radar image captured "+minutes+" minutes ago")
     </script>
 {% endmacro %}
-
+{% macro round_number(x) %}
+   {% if x is none %}
+      <span class="na">N.A.</span>
+   {% else %}
+      {{ x | round(1) }}
+   {% endif %}
+{% endmacro %}
 {% macro metar(wx) %}
     <h1>Latest weather at {{ wx.location }}</h1>
     <div class="navbar">
@@ -17,14 +23,15 @@
             document.write("weather observed "+minutes+" minutes ago")
         </script>
         <br>
-        Temperature: {{ wx.temp|round(1) }} &deg;F  Dewpoint: {{ wx.dewpt|round(1) }} &deg;F
-        Relative Humidity: {{ wx.humidity|round(1) }}%<br>
+        Temperature: {{ round_number(wx.temp) }} &deg;F
+        Dewpoint:  {{ round_number(wx.dewpt) }}&deg;F
+        Relative Humidity: {{ round_number(wx.humidity) }}%<br>
         Wind:  {{ wx.wind_alpha }}
         {% if not wx.wind_dir is none %}
             ({{ wx.wind_dir }}&deg)
         {% endif %}
-        {{ wx.wind_speed|round(1) }} mph
-        Pressure: {{ wx.pressure|round(1) }} mbar<br>
+        {{ round_number(wx.wind_speed) }} mph
+        Pressure: {{ round_number(wx.pressure) }} mbar<br>
         {{ wx.sky }} ; {{ wx.present_weather }}
     </div>
 {% endmacro %}

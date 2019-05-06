@@ -169,6 +169,7 @@ class RadarFetch:
         return result
 
     async def fetch_motd(self, session: ClientSession):
+        # pylint: disable = too-many-locals
         url = "https://www.weather.gov/images/bgm/finalMOD.jpg"
         target_dir = self._cache / "bgm" / "finalMod"
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -333,16 +334,16 @@ class RadarFetch:
         arguments = {
             "radar_id": "BGM",
             "latest_wx": {
-                "wx_time": latest_wx["time"],
+                "wx_time": latest_wx.get("time"),
                 "location": "Ithaca Airport",
-                "temp": latest_wx["temp"],
-                "dewpt": latest_wx["dewpt"],
-                "humidity": latest_wx["humidity"],
-                "wind_speed": latest_wx["wind_speed"],
+                "temp": latest_wx.get("temp"),
+                "dewpt": latest_wx.get("dewpt"),
+                "humidity": latest_wx.get("humidity"),
+                "wind_speed": latest_wx.get("wind_speed"),
                 "wind_alpha": wind_alpha(latest_wx.get("wind_dir")),
                 "wind_dir": latest_wx.get("wind_dir"),
-                "pressure": latest_wx["pressure"],
-                "sky": latest_wx["sky"],
+                "pressure": latest_wx.get("pressure"),
+                "sky": latest_wx.get("sky"),
                 "present_weather": present_weather
             }
         }
