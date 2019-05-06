@@ -5,7 +5,7 @@ import json
 import os
 import re
 import sys
-from email.utils import parsedate_to_datetime
+from email.utils import parsedate_to_datetime, format_datetime
 from logging import getLogger
 from shutil import copyfile
 from uuid import uuid4, NAMESPACE_URL, uuid5
@@ -80,7 +80,12 @@ async def ahead(session: ClientSession, url: str):
     async with session.head(url) as response:
         return response.headers
 
-async def bfetch(session: ClientSession, url: str):
+
+class NotModified(Exception):
+    pass
+
+
+async def bfetch(session: ClientSession, url: str, request_headers=None):
     """
     Asynchronous binary fetch.  Do a GET request,  return binary data,  properly  shutdown
 
@@ -88,7 +93,11 @@ async def bfetch(session: ClientSession, url: str):
     :param url: The URL we want
     :return:
     """
-    async with session.get(url) as response:
+    kwargs = {}
+    if request_headers:
+        kwargs["headers"] = request_headers
+
+    async with session.get(url, **kwargs) as response:
         if response.status >= 400:
             #
             # 404 errors appear to happen regularly.  I don't want these resulting in a
@@ -98,7 +107,10 @@ async def bfetch(session: ClientSession, url: str):
             action("Got status %s for GET %s", response.status, url)
 
         response.raise_for_status()
-        return await response.read()
+        if response.status == 304:
+            raise NotModified()
+
+        return (await response.read(), response.headers)
 
 class NoVideoFrames(ValueError):
     pass
@@ -161,8 +173,7 @@ class RadarFetch:
         target_dir = self._cache / "bgm" / "finalMod"
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        headers = await ahead(session, url)
-        last_modified = to_zulu_string(parsedate_to_datetime(headers['Last-Modified']))
+        request_headers = {}
         cursor = self._adb.aql.execute("""
         for row in snapshots
            filter row.url==@url
@@ -172,30 +183,43 @@ class RadarFetch:
         """, bind_vars={"url": url})
         try:
             last = next(cursor)
-            if last["last_modified"] >= last_modified:
-                hexdigest = last["sha384"]
-                filename = target_dir / f"{hexdigest}.jpg"
-                if filename.exists():
-                    observed = sha384(filename.read_bytes()).hexdigest()
-                    if observed == hexdigest:
-                        return filename
+            http_modified = format_datetime(from_zulu_string(last["last_modified"]), usegmt=True)
+
+            #
+            # note here we are testing the file in storage no matter if it is the latest or not
+            #
+            hexdigest = last["sha384"]
+            filename = target_dir / f"{hexdigest}.jpg"
+            if filename.exists():
+                observed = sha384(filename.read_bytes()).hexdigest()
+                if observed == hexdigest:
+                    request_headers["If-Modified-Since"] = http_modified
+                    LOGGER.debug("Found file %s with correct SHA384 digest", filename)
+                else:
                     LOGGER.error("Found file %s did not match expected SHA384 digest", filename)
                     filename.unlink()
-                else:
-                    LOGGER.error("Didn't file %s although file was in database", filename)
+            else:
+                LOGGER.error("Didn't find file %s although file was in database", filename)
         except StopIteration:
             pass
 
-        content = await bfetch(session, url)
+        try:
+            (content, headers) = await bfetch(session, url, request_headers=request_headers)
+        except NotModified:
+            LOGGER.debug("Recieved 304 Not Modified for url %s", url)
+            return filename
+
         LOGGER.debug("Downloaded %d bytes from url %s", len(content), url)
         hexdigest = sha384(content).hexdigest()
-        LOGGER.debug("SHA384 digest: %s")
+        last_modified = to_zulu_string(parsedate_to_datetime(headers['Last-Modified']))
+        LOGGER.debug("SHA384 digest: %s", hexdigest)
+        LOGGER.debug("Last modified date: %s ", last_modified)
 
         self._adb.insert_document("snapshots", {
             "_key": str(uuid4()),
             "url": url,
             "last_modified": last_modified,
-            "content_length": int(headers["Content-Length"]),
+            "content_length": len(content),
             "sha384": hexdigest
         })
 
@@ -278,7 +302,7 @@ class RadarFetch:
                 target_file, source_url)
             return
 
-        gif_data = await bfetch(session, source_url)
+        (gif_data, _) = await bfetch(session, source_url)
         target_file.parent.mkdir(parents=True, exist_ok=True)
         with open(target_file, "wb") as that:
             that.write(gif_data)
