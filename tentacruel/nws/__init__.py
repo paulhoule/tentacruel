@@ -188,11 +188,11 @@ class RadarFetch:
             #
             # note here we are testing the file in storage no matter if it is the latest or not
             #
-            hexdigest = last["sha384"]
-            filename = target_dir / f"{hexdigest}.jpg"
+            old_hexdigest = last["sha384"]
+            filename = target_dir / f"{old_hexdigest}.jpg"
             if filename.exists():
                 observed = sha384(filename.read_bytes()).hexdigest()
-                if observed == hexdigest:
+                if observed == old_hexdigest:
                     request_headers["If-Modified-Since"] = http_modified
                     LOGGER.debug("Found file %s with correct SHA384 digest", filename)
                 else:
@@ -201,7 +201,7 @@ class RadarFetch:
             else:
                 LOGGER.error("Didn't find file %s although file was in database", filename)
         except StopIteration:
-            pass
+            old_hexdigest = None
 
         try:
             (content, headers) = await bfetch(session, url, request_headers=request_headers)
@@ -215,16 +215,16 @@ class RadarFetch:
         LOGGER.debug("SHA384 digest: %s", hexdigest)
         LOGGER.debug("Last modified date: %s ", last_modified)
 
-        self._adb.insert_document("snapshots", {
-            "_key": str(uuid4()),
-            "url": url,
-            "last_modified": last_modified,
-            "content_length": len(content),
-            "sha384": hexdigest
-        })
+        if hexdigest != old_hexdigest:
+            self._adb.insert_document("snapshots", {
+                "_key": str(uuid4()),
+                "url": url,
+                "last_modified": last_modified,
+                "content_length": len(content),
+                "sha384": old_hexdigest
+            })
 
-
-        filename = target_dir / f"{hexdigest}.jpg"
+        filename = target_dir / f"{old_hexdigest}.jpg"
         filename.write_bytes(content)
         return filename
 
