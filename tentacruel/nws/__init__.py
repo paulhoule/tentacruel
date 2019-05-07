@@ -225,7 +225,7 @@ class RadarFetch:
                 "sha384": old_hexdigest
             })
 
-        filename = target_dir / f"{old_hexdigest}.jpg"
+        filename = target_dir / f"{hexdigest}.jpg"
         filename.write_bytes(content)
         return filename
 
