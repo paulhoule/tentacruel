@@ -222,7 +222,7 @@ class RadarFetch:
                 "url": url,
                 "last_modified": last_modified,
                 "content_length": len(content),
-                "sha384": old_hexdigest
+                "sha384": hexdigest
             })
 
         filename = target_dir / f"{hexdigest}.jpg"
