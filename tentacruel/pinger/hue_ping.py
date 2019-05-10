@@ -11,6 +11,7 @@ bedroom lights are::
 """
 import json
 from asyncio import sleep, CancelledError
+from logging import getLogger
 from pathlib import Path
 from typing import Dict, Any, Coroutine, Callable
 from uuid import UUID, uuid5, uuid4
@@ -21,6 +22,7 @@ from tentacruel import keep
 from tentacruel.pinger import iso_zulu_now
 
 HUE_NS = UUID('63b25700-662c-11e9-8c24-9eb6d06a70c5')
+LOGGER = getLogger(__name__)
 
 class AsyncHue():
     """
@@ -180,4 +182,5 @@ async def protect(that: Callable[[], Coroutine], restart_wait=10.0):
         except CancelledError: # pylint: disable=try-except-raise
             raise
         except Exception: # pylint: disable=broad-except
+            LOGGER.error("Ran into exception running coroutine", exc_info=True)
             await sleep(restart_wait)

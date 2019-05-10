@@ -8,7 +8,7 @@ from asyncio import run, get_event_loop, create_task
 from aio_pika import ExchangeType, connect_robust
 from tentacruel.config import get_config
 from tentacruel.pinger import ensure_proactor, Pinger
-from tentacruel.pinger.hue_ping import hue_loop
+from tentacruel.pinger.hue_ping import hue_loop, protect
 
 
 async def pika_connect(config):
@@ -34,7 +34,7 @@ async def amain():
     config = get_config()
     exchange = await pika_connect(config)
     pinger = Pinger(exchange)
-    create_task(hue_loop(exchange))
+    create_task(protect(lambda: hue_loop(exchange)))
     await pinger.ping_all()
 
 

@@ -51,7 +51,8 @@ async def ping(host):
     # Building the command. Ex: "ping -c 1 google.com"
     if ":" in host:
         if platform.system().lower() == 'windows':
-            raise NotImplementedError("I don't know how to ping from an interface on windows")
+            logger.warning("I don't know how to ping from an interface on windows")
+            return True
 
         (interface, destination) = host.split(":")
         command = ['ping', param, '1', '-I', interface, destination]
