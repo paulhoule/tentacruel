@@ -1,0 +1,5 @@
+for event in sqs_events
+   filter event.deviceId == 'ae8df7bf-6903-5c41-aad6-de4aeb24dc87'
+   filter event.attribute == 'hue.reachable'
+   sort event.eventTime desc
+   return event

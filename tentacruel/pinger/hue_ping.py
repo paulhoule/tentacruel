@@ -2,11 +2,17 @@
 Objects for pinging the Phillips Hue system to determine which lights are available and
 what state they are in.
 
+Temporary notes:
+
+bedroom lights are::
+
+    UUID('ae8df7bf-6903-5c41-aad6-de4aeb24dc87')
+    UUID('2d424242-bf47-5e2f-b5ff-b325d2d8017d')
 """
 import json
-from asyncio import sleep
+from asyncio import sleep, CancelledError
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Coroutine, Callable
 from uuid import UUID, uuid5, uuid4
 
 from aio_pika import Exchange, Message
@@ -144,3 +150,34 @@ async def hue_loop(exchange: Exchange) -> None:
         while True:
             await pinger.poll()
             await sleep(10)
+
+async def protect(that: Callable[[], Coroutine], restart_wait=10.0):
+    """
+    Create a coroutine that 'restarts' a coroutine when it fails.  The main
+    use case is that the function inside can fail due to a transient external
+    error.  In this case there are multiple tasks running and we want to keep
+    the whole process running even though one process crashed.
+
+    I put 'restart' in quotes because we can't quite restart a coroutine,  but
+    we can start a new one.  To be able to do that,  we pass in `that` which
+    is a function that returns a coroutine.
+
+    This function catches every exception except for `CancelledError`, because
+    it assumes that if the inner coroutine is cancelled.
+
+    To borrow trouble:  shared resources could be a problem.  For instance,  we
+    would like to share a database or message queue connection between multiple
+    tasks.  If one of these connections is defective we ought to replace it,  then
+    restart the dependencies.
+
+    :param that: function that returns a coroutine
+    :param restart_wait: time in seconds to wait before `restart`
+    :return: return value of coroutine
+    """
+    while True:
+        try:
+            return await that()
+        except CancelledError: # pylint: disable=try-except-raise
+            raise
+        except Exception: # pylint: disable=broad-except
+            await sleep(restart_wait)
