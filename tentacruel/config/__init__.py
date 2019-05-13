@@ -3,7 +3,8 @@ Configuration-related functions.
 
 Read YAML configuration,  connect to databases,  etc.
 """
-
+from logging import getLogger, StreamHandler
+from os import environ
 from pathlib import Path
 import yaml
 from pkg_resources import resource_stream
@@ -33,3 +34,15 @@ def get_config(config_file="config.yaml", package=None):
 
     with open(Path.home() / ".tentacruel" / config_file) as config:
         return yaml.load(config)
+
+def configure_logging() -> None:
+    """
+    Configure logging. Call once in the "main()" method of an application so
+    that we can switch debug logging on when necessary
+
+    :return: Nothing,  only has side effects
+    """
+    if "LOGGING_LEVEL" in environ:
+        getLogger(None).setLevel(environ["LOGGING_LEVEL"])
+
+    getLogger(None).addHandler(StreamHandler())

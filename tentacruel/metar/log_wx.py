@@ -9,7 +9,7 @@ from sys import exc_info
 
 from aiohttp import ClientSession, ClientConnectorError
 from arango import ArangoClient, DocumentInsertError
-from tentacruel.config import get_config
+from tentacruel.config import get_config, configure_logging
 from tentacruel.metar import get_metar
 
 from _socket import gaierror
@@ -24,6 +24,7 @@ async def amain() -> None:
     :return: nothing
     """
     config = get_config()
+    configure_logging()
 
     adb_conf = config["arangodb"]["events"]
     client = ArangoClient(**adb_conf["client"])

@@ -103,5 +103,4 @@ def assign_key(metar_data: Dict[str, Any]) -> None:
     :param metar_data: a Dict containing metar data
     :return: nothing
     """
-    parts = metar_data["code"].split(" ")
-    metar_data["_key"] = metar_data["station"] + '-' + '201811' + '-' + parts[1]
+    metar_data["_key"] = metar_data["station"] + metar_data["time"]
