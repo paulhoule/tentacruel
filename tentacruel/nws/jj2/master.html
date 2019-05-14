@@ -5,7 +5,10 @@
         <style>
             BODY { background: black; color: white }
             h1 { text-align: center; color: white}
-            .navbar { width: 1250px; margin: auto; text-align: center}
+            .navbar { width: 1250px; margin: auto; text-align: center }
+            .navbar a { color: white }
+            .main { width: 1250px; margin: auto; text-align: center  }
+            .metar { width: 1250px; margin: auto; text-align: center  }
             .pred1hr { display: flex; width: 1250px; margin: auto}
             .motd { margin: auto }
             figcaption { font-weight: bold}
@@ -15,18 +18,18 @@
     <body>
         {{ macros.metar(latest_wx) }}
         <h1>{% block header %}{% endblock %}</h1>
-        <div class="navbar">
-            {% block navbar %}
-            {% endblock %}
+            <div class="navbar">
+                {{ macros.navbar(template_name,pages) }}
+            </div>
 
             {% if failed %}
                 <h1>No current radar images available from NWS</h1>
-                <div class="navbar">
+                <div class="main">
                     Check <a href="{{ radar_html }}}">NWS product page.</a>
                 </div>
             {% else %}
                 {% if last_date %}
-                <div class="navbar">
+                <div class="main">
                     {{ macros.radar_age(last_date) }}
                 </div>
                 {% endif %}

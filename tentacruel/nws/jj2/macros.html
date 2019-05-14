@@ -15,7 +15,7 @@
 {% endmacro %}
 {% macro metar(wx) %}
     <h1>Latest weather at {{ wx.location }}</h1>
-    <div class="navbar">
+    <div class="metar">
          <script>
             last_date = Date.parse("{{ wx.wx_time }}")
             seconds = (Date.now()-last_date)/1000
@@ -28,7 +28,7 @@
         Relative Humidity: {{ round_number(wx.humidity) }}%<br>
         Wind:  {{ wx.wind_alpha }}
         {% if not wx.wind_dir is none %}
-            ({{ wx.wind_dir }}&deg)
+            ({{ wx.wind_dir }}&deg;)
         {% endif %}
         {{ round_number(wx.wind_speed) }} mph
         Pressure: {{ round_number(wx.pressure) }} mbar<br>
@@ -38,4 +38,15 @@
 
 {% macro draw_forecast(period) %}
 <b>{{ period.name }}</b>: {{ period.detailedForecast }}
+{% endmacro %}
+
+{% macro navbar(filename, pages) %}
+    {% for link,title in pages.items() %}
+        {% if link == filename %}
+            <span class="thisPage"> {{ title }} </span>
+        {% else %}
+            <span> <a href="{{ link }}">{{ title }}</a> </span>
+        {% endif %}
+        {% if not loop.last %} | {% endif %}
+    {% endfor %}
 {% endmacro %}

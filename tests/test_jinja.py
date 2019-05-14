@@ -16,7 +16,8 @@ def test_001():
             "pressure": 900.9,
             "sky": "very cloudy",
             "present_weather": "hurricane force winds,  don't try to land"
-        }
+        },
+        "pages": {}
     }
 
     template = JINJA.get_template("northeast.html")
@@ -45,7 +46,8 @@ def test_002():
             "pressure": None,
             "sky": None,
             "present_weather": None
-        }
+        },
+        "pages": {}
     }
 
     template = JINJA.get_template("northeast.html")

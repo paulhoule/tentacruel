@@ -131,6 +131,10 @@ class RadarFetch:
         self._output = Path(config["paths"]["output"])
         self._adb = adb
         self._resources = {}
+        self._pages = {
+            pattern["template"] : pattern["title"] for pattern in self._patterns
+        }
+        self._pages["forecast.html"] = "Short-term forecast"
 
     async def fetch_forecast_text(self, session: ClientSession):
         url = "https://api.weather.gov/gridpoints/BGM/47,66/forecast"
@@ -241,6 +245,8 @@ class RadarFetch:
     def copy_template(self, pattern, failed=False, **kwargs):
         template_name = pattern["template"]
         destination = pattern["template"]
+        kwargs["template_name"] = template_name
+        kwargs["pages"] = self._pages
         kwargs["failed"] = failed
         if kwargs.get("failed"):
             kwargs["radar_html"] = pattern["radar_html"]

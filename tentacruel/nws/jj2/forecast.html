@@ -2,10 +2,6 @@
 {% block header %}
 Current Forecast
 {% endblock %}
-{% block navbar %}
-    <a href="base_reflectivity.html">Base Reflectivity</a> |
-    <a href="northeast.html">Northeast Regional</a>
-{% endblock %}
 {% block radar %}
     <figure class="motd">
         {{ macros.draw_forecast(forecast.properties.periods[0]) }}

@@ -6,6 +6,7 @@
 products:
   - pattern: "ridge/RadarImg/N0R/BGM/BGM_[0-9]{8}_[0-9]{4}_N0R.gif"
     date_fn: radar_file_date
+    title: Base Reflectivity
     overlays:
       - Overlays/County/Short/BGM_County_Short.gif
       - Overlays/Highways/Short/BGM_Highways_Short.gif
@@ -18,6 +19,7 @@ products:
     template: base_reflectivity.html
     radar_html: https://radar.weather.gov/radar.php?rid=bgm&product=N0R&overlay=11101111&loop=no
   - pattern: ridge/RadarImg/N1P/BGM/BGM_[0-9]{8}_[0-9]{4}_N1P.gif
+    title: One-Hour Precipitation Prediction
     date_fn: radar_file_date
     video: N1PBGM.mp4
     overlays:
@@ -32,6 +34,7 @@ products:
     radar_html: https://radar.weather.gov/radar.php?rid=bgm&product=N0R&overlay=11101111&loop=no
   - pattern: Conus/RadarImg/northeast_[0-9]{8}_[0-9]{4}.gif
     date_fn: radar_file_date
+    title: Northeast Regional
     still: northeast.png
     video: northeast.mp4
     window: 6 hours
