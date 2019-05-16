@@ -5,11 +5,12 @@ Command-line commands that operate on message queues.
 import json
 from asyncio import get_event_loop, sleep
 from logging import getLogger
-from os import environ
 
 from aio_pika import connect_robust, ExchangeType, Message
 
 # pylint: disable=invalid-name
+from tentacruel.sqs import SqsQueue
+
 logger = getLogger(__name__)
 
 # pylint: disable=too-few-public-methods
@@ -22,16 +23,7 @@ class DrainSQS:
     def __init__(self, config):
         self._prefixes = {}
         self.config = config
-        self.sqs = self._connect_to_sqs()
-
-    def _connect_to_sqs(self):
-        from boto3 import client
-        return client(
-            "sqs",
-            aws_access_key_id=self.config["aws"]["aws_access_key_id"],
-            aws_secret_access_key=self.config["aws"]["aws_secret_access_key"],
-            region_name=self.config["aws"]["region_name"]
-        )
+        self.sqs = SqsQueue(config)
 
     async def do(self, parameters):
         """
@@ -68,20 +60,11 @@ class DrainSQS:
 
     async def _poll_sqs(self, exchange):
         logger.debug("Waiting to receive messages from SQS queue")
-        response = self.sqs.receive_message(
-            QueueUrl=self.config["aws"]["queue_url"],
-            MaxNumberOfMessages=10,
-            WaitTimeSeconds=int(environ.get("WAIT_TIME_SECONDS", 20))
-        )
+        messages = self.sqs.receive()
         event_batch = []
         delete_batch = []
-        if "Messages" not in response:
-            if response["ResponseMetadata"]["HTTPStatusCode"] != 200:
-                logger.error("Got error while receiving queue messages; response: %s", response)
-                raise RuntimeError("Error receiving queue messages")
-        else:
-            logger.debug("Received %d messages from SQS queue", len(response["Messages"]))
-            for message in response["Messages"]:
+        if messages:
+            for message in messages:
                 delete_batch.append({
                     "Id": message["MessageId"],
                     "ReceiptHandle": message["ReceiptHandle"]
@@ -100,8 +83,6 @@ class DrainSQS:
                 await exchange.publish(message, routing_key=event["attribute"])
 
             logger.debug("Delete messages from SQS")
-            self.sqs.delete_message_batch(
-                QueueUrl=self.config["aws"]["queue_url"],
-                Entries=delete_batch
-            )
+            self.sqs.delete(delete_batch)
+
         return event_batch

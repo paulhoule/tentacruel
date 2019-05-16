@@ -21,6 +21,20 @@ def connect_to_adb(config):
     client = ArangoClient(**config["arangodb"]["events"]["client"])
     return client.db(**config["arangodb"]["events"]["database"])
 
+def connect_to_sqs(config):
+    """
+    Given configuration dictionary,  return a boto3 connection for SQS
+
+    :param config: application config dictionary
+    :return: SQS connection object from boto3
+    """
+    from boto3 import client
+    return client(
+        "sqs",
+        aws_access_key_id=config["aws"]["aws_access_key_id"],
+        aws_secret_access_key=config["aws"]["aws_secret_access_key"],
+        region_name=config["aws"]["region_name"]
+    )
 
 def get_config(config_file="config.yaml", package=None):
     """
