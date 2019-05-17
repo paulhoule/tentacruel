@@ -8,8 +8,9 @@
             .navbar { width: 1250px; margin: auto; text-align: center }
             .navbar a { color: white }
             .main { width: 1250px; margin: auto; text-align: center  }
+            .forecast { width: 700px; margin: auto; text-align: center }
             .metar { width: 1250px; margin: auto; text-align: center  }
-            .pred1hr { display: flex; width: 1250px; margin: auto}
+            .radar { display: flex; width: 1250px; margin: auto; justify-content: center}
             .motd { margin: auto }
             figcaption { font-weight: bold}
         </style>
@@ -21,7 +22,7 @@
             <div class="navbar">
                 {{ macros.navbar(template_name,pages) }}
             </div>
-
+            {% block forecast %}{% endblock %}
             {% if failed %}
                 <h1>No current radar images available from NWS</h1>
                 <div class="main">
@@ -33,7 +34,7 @@
                     {{ macros.radar_age(last_date) }}
                 </div>
                 {% endif %}
-                <div class="pred1hr">
+                <div class="radar">
                     {% block radar %}{% endblock %}
                 </div>
             {% endif %}

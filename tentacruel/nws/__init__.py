@@ -495,6 +495,12 @@ class RadarFetch:
     def make_forecast(self):
         arguments = self.wx_arguments()
         arguments["forecast"] = self._resources["forecast"]
+        if "properties" not in arguments["forecast"]:
+            LOGGER.error(
+                "No 'properties' found in forecast data:\n%s",
+                json.dumps(arguments["forecast"], indent=2)
+            )
+
         motd = self._resources["motd"]
         copyfile(motd, self._output / "motd.jpg")
         pattern = {

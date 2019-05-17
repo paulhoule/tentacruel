@@ -2,13 +2,23 @@
 {% block header %}
 Current Forecast
 {% endblock %}
-{% block radar %}
-    <figure class="motd">
+{% block forecast %}
+<div class="forecast">
+    {% if "properties" in forecast %}
+        <hr>
         {{ macros.draw_forecast(forecast.properties.periods[0]) }}
-        <br>
+        <hr>
         {{ macros.draw_forecast(forecast.properties.periods[1]) }}
-        <br>
+        <hr>
         {{ macros.draw_forecast(forecast.properties.periods[2]) }}
+        <hr>
+    {% else %}
+    No forecast data in most recent download!
+    {% endif %}
+</div>
+{% endblock %}
+{% block radar %}
+    <figure>
         <figcaption>Message of the Day</figcaption>
         <img src="motd.jpg">
     </figure>
