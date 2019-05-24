@@ -66,7 +66,8 @@ async def afetch(session: ClientSession, url: str):
     :return:
     """
     async with session.get(url) as response:
-        return (await response.text(), response.headers, response.status)
+        response.raise_for_status()
+        return (await response.text(), response.headers)
 
 async def ahead(session: ClientSession, url: str):
     """
@@ -148,16 +149,10 @@ class RadarFetch:
                 return cached["content"]
 
         try:
-            (content, headers, status) = await afetch(session, url)
-            if status == 503:
-                LOGGER.error("Got error 503 fetching forecast (temporarily not available")
-            if cached:
-                LOGGER.error("Falling back on cached content from arangodb for url %s", url)
-                return cached["content"]
-            LOGGER.error("Could not find url %s in cache", url)
-            raise SystemError()
-        except ClientError:
-            LOGGER.error("Attempt to fetch url %s failed", url)
+            (content, headers) = await afetch(session, url)
+        except ClientError as that:
+            status = getattr(that,"status","Unknown")
+            LOGGER.error("Attempt to fetch url %s failed with %s status code.", url, status)
             if cached:
                 LOGGER.error("Falling back on cached content from arangodb for url %s", url)
                 return cached["content"]
@@ -279,7 +274,7 @@ class RadarFetch:
 
         url_directory = self._source_base + product_dir + "/"
         LOGGER.debug("Checking %s", url_directory)
-        (target, _, _) = await afetch(session, url_directory)
+        (target, *_) = await afetch(session, url_directory)
         soup = BeautifulSoup(target, features="lxml")
         links = soup.find_all("a")
         crawl = []
