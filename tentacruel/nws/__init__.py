@@ -140,8 +140,7 @@ class RadarFetch:
     async def fetch_forecast_text(self, session: ClientSession):
         url = "https://api.weather.gov/gridpoints/BGM/47,66/forecast"
         _key = str(uuid5(NAMESPACE_URL, url))
-        cache = self._adb.collection("cache")
-        cached = cache.get(_key)
+        cached = self._adb.collection("cache").get(_key)
         if cached:
             old_expires = from_zulu_string(cached["expires"])
             if old_expires > utcnow():
@@ -151,10 +150,15 @@ class RadarFetch:
         try:
             (content, headers) = await afetch(session, url)
         except ClientError as that:
-            status = getattr(that,"status","Unknown")
-            LOGGER.error("Attempt to fetch url %s failed with %s status code.", url, status)
+            status = getattr(that, "status", "Unknown")
+            if status in [500, 503]:
+                logger = LOGGER.warning
+            else:
+                logger = LOGGER.error
+
+            logger("Attempt to fetch url %s failed with %s status code.", url, status)
             if cached:
-                LOGGER.error("Falling back on cached content from arangodb for url %s", url)
+                logger("Falling back on cached content from arangodb for url %s", url)
                 return cached["content"]
             LOGGER.error("Could not find url %s in cache", url)
             raise
