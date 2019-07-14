@@ -33,14 +33,14 @@ async def amain() -> None:
 
     airport = "KITH"
     async with ClientSession() as session:
-        # try:
-        #     metar = await get_metar(session, airport)
-        # except ClientConnectorError:
-        #     (_, exception, _) = exc_info()
-        #     inner_exception = exception.os_error
-        #     if isinstance(inner_exception, gaierror) and "Temporary" in str(inner_exception):
-        #         return
-        #     raise
+        try:
+            metar = await get_metar(session, airport)
+        except ClientConnectorError:
+            (_, exception, _) = exc_info()
+            inner_exception = exception.os_error
+            if isinstance(inner_exception, gaierror) and "Temporary" in str(inner_exception):
+                return
+            raise
         # try:
         #     LOGGER.debug(metar)
         #     collection.insert(metar, silent=True)
