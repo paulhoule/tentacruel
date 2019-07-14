@@ -41,11 +41,11 @@ async def amain() -> None:
             if isinstance(inner_exception, gaierror) and "Temporary" in str(inner_exception):
                 return
             raise
-        # try:
-        #     LOGGER.debug(metar)
-        #     collection.insert(metar, silent=True)
-        # except DocumentInsertError:
-        #     pass
+        try:
+            LOGGER.debug(metar)
+            collection.insert(metar, silent=True)
+        except DocumentInsertError:
+            pass
         LOGGER.debug("About to shut down http client session")
     LOGGER.debug("End of amain() method")
 
