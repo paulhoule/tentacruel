@@ -5,7 +5,7 @@ Command line program to create movies for radar
 import datetime
 import re
 
-from asyncio import get_event_loop
+from asyncio import get_event_loop, current_task
 from logging import getLogger, StreamHandler
 from os import environ
 from sys import exc_info

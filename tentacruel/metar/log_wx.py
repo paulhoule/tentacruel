@@ -46,6 +46,8 @@ async def amain() -> None:
             collection.insert(metar, silent=True)
         except DocumentInsertError:
             pass
+        LOGGER.debug("About to shut down http client session")
+    LOGGER.debug("End of amain() method")
 
 def main() -> None:
     """
