@@ -14,11 +14,12 @@ from sys import exc_info
 
 
 from aiohttp import ClientConnectorError, ClientSession
+
+from bus import bus_loop
+from tentacruel.aio import handleClientConnectorError
 from tentacruel.config import get_config, connect_to_adb
 from tentacruel.nws import RadarFetch, register
 from tentacruel.metar.log_wx import metar_cycle
-
-from _socket import gaierror
 
 LOG = getLogger(__name__)
 
@@ -61,24 +62,20 @@ async def amain() -> None:
 
     fetcher = RadarFetch(config, adb)
     if args.loop:
-        await wait([video_loop(fetcher), metar_loop("KITH", adb.collection("metar"))])
+        await wait([
+            video_loop(fetcher),
+            metar_loop("KITH", adb.collection("metar")),
+            bus_loop(adb.collection("bus"))
+        ])
     else:
         await video_cycle(fetcher)
 
 async def video_cycle(fetcher: RadarFetch):
     try:
         await fetcher.refresh()
-    except ClientConnectorError:
-        (_, exception, _) = exc_info()
-        inner_exception = exception.os_error
-        if isinstance(inner_exception, gaierror) and "Temporary" in str(inner_exception):
-            return
-        if isinstance(inner_exception, OSError):
-            if "Network is unreachable" in str(inner_exception):
-                return False
-            if "Connect call failed" in str(inner_exception):
-                return False
-        raise
+    except ClientConnectorError as that:
+        return handleClientConnectorError(that)
+
     fetcher.make_video()
     fetcher.make_forecast()
     return True

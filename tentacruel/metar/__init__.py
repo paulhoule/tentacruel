@@ -9,16 +9,7 @@ from typing import Dict, Any
 from metar.Metar import Metar
 from aiohttp import ClientSession
 
-async def afetch(session: ClientSession, url: str):
-    """
-    Asynchronous fetch.  Do a GET request,  return text,  properly  shutdown
-
-    :param session: ClientSession object for aiohttp connection
-    :param url: The URL we want
-    :return:
-    """
-    async with session.get(url) as response:
-        return await response.text()
+from tentacruel.aio import afetch
 
 async def get_metar(session: ClientSession, airport: str) -> Dict[str, Any]:
     """
