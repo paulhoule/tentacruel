@@ -21,7 +21,7 @@ async def get_bus(session: ClientSession, route: str) -> Dict[str, Any]:
     return {"buses": json.loads(text)}
 
 async def bus_cycle(session: ClientSession, collection: Collection):
-    bus_data = await get_bus(session,"52")
+    bus_data = await get_bus(session,"52,53")
     timestamp_id = "{:016d}".format(int(round(time.time()-1576684879,2)*100))
     bus_data["_key"] = timestamp_id
     bus_data["observed"] = to_zulu_string(utcnow())
