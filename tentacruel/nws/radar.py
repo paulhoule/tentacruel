@@ -2,21 +2,26 @@
 Command line program to create movies for radar
 
 """
+import argparse
+from argparse import ArgumentParser
 import datetime
 import re
 
-from asyncio import get_event_loop, current_task
+from asyncio import get_event_loop, current_task, sleep, wait
 from logging import getLogger, StreamHandler
 from os import environ
 from sys import exc_info
 
 
-from aiohttp import ClientConnectorError
+from aiohttp import ClientConnectorError, ClientSession
+
+from bus import bus_loop
+from tentacruel.aio import handleClientConnectorError
 from tentacruel.config import get_config, connect_to_adb
 from tentacruel.nws import RadarFetch, register
+from tentacruel.metar.log_wx import metar_cycle
 
-from _socket import gaierror
-
+LOG = getLogger(__name__)
 
 @register
 def radar_file_date(name: str) -> datetime.datetime:
@@ -34,15 +39,20 @@ def radar_file_date(name: str) -> datetime.datetime:
     (year, month, day, hour, minute) = map(int, match.groups())
     return datetime.datetime(year, month, day, hour, minute, tzinfo=datetime.timezone.utc)
 
+def parse_arguments() -> ArgumentParser:
+    parser = ArgumentParser()
+    parser.add_argument("-l","--loop",help="Continuously loop to periodically update radar and WX",action="store_true")
+    return parser.parse_args()
+
 async def amain() -> None:
     """
     Main method of radar fetcher program
 
     :return:
     """
+    args = parse_arguments()
     if "LOGGING_LEVEL" in environ:
         getLogger(None).setLevel(environ["LOGGING_LEVEL"])
-
     getLogger(None).addHandler(StreamHandler())
 
     server_config = get_config("wx-paths.yaml")
@@ -51,21 +61,38 @@ async def amain() -> None:
     adb = connect_to_adb(get_config())
 
     fetcher = RadarFetch(config, adb)
+    if args.loop:
+        await wait([
+            video_loop(fetcher),
+            metar_loop("KITH", adb.collection("metar")),
+            bus_loop(adb.collection("bus"))
+        ])
+    else:
+        await video_cycle(fetcher)
+
+async def video_cycle(fetcher: RadarFetch):
     try:
         await fetcher.refresh()
-    except ClientConnectorError:
-        (_, exception, _) = exc_info()
-        inner_exception = exception.os_error
-        if isinstance(inner_exception, gaierror) and "Temporary" in str(inner_exception):
-            return
-        if isinstance(inner_exception, OSError):
-            if "Network is unreachable" in str(inner_exception):
-                return
-            if "Connect call failed" in str(inner_exception):
-                return
-        raise
+    except ClientConnectorError as that:
+        return handleClientConnectorError(that)
+
     fetcher.make_video()
     fetcher.make_forecast()
+    return True
+
+async def video_loop(fetcher:RadarFetch):
+    while True:
+        LOG.info("Fetching video")
+        await video_cycle(fetcher)
+        LOG.info("Complete video fetch")
+        await sleep(300)
+
+async def metar_loop(airport, collection):
+    async with ClientSession() as session:
+        while True:
+            LOG.info("Fetching METAR")
+            await metar_cycle(session, airport, collection)
+            await sleep(30)
 
 def main() -> None:
     """

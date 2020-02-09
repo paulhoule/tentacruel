@@ -9,6 +9,8 @@ from sys import exc_info
 
 from aiohttp import ClientSession, ClientConnectorError
 from arango import ArangoClient, DocumentInsertError
+
+from tentacruel.aio import handleClientConnectorError
 from tentacruel.config import get_config, configure_logging
 from tentacruel.metar import get_metar
 
@@ -33,21 +35,20 @@ async def amain() -> None:
 
     airport = "KITH"
     async with ClientSession() as session:
-        try:
-            metar = await get_metar(session, airport)
-        except ClientConnectorError:
-            (_, exception, _) = exc_info()
-            inner_exception = exception.os_error
-            if isinstance(inner_exception, gaierror) and "Temporary" in str(inner_exception):
-                return
-            raise
-        try:
-            LOGGER.debug(metar)
-            collection.insert(metar, silent=True)
-        except DocumentInsertError:
-            pass
-        LOGGER.debug("About to shut down http client session")
+        await metar_cycle(session, airport, collection)
     LOGGER.debug("End of amain() method")
+
+async def metar_cycle(session, airport, collection):
+    try:
+        metar = await get_metar(session, airport)
+    except ClientConnectorError as that:
+        return handleClientConnectorError(that)
+    try:
+        LOGGER.debug(metar)
+        collection.insert(metar, silent=True)
+    except DocumentInsertError:
+        pass
+    LOGGER.debug("About to shut down http client session")
 
 def main() -> None:
     """

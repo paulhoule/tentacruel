@@ -173,7 +173,7 @@ class RadarFetch:
                 "content": result
             }
             self._adb.aql.execute("""
-                UPSERT {_key: @key} INSERT @document REPLACE @document IN cache"
+                UPSERT {_key: @key} INSERT @document REPLACE @document IN cache
             """, bind_vars={"key": _key, "document": document})
 
         return result
