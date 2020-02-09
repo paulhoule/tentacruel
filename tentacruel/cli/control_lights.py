@@ -28,7 +28,7 @@ class ControlLights:
                 self.send_to_hue,
                 zone
             )
-            for zone in config["zones"] if "sensors" in zone
+            for zone in config["zones"]
         ]
 
     async def do(self, parameters):
@@ -59,52 +59,20 @@ class ControlLights:
             )
 
             queue = await channel.declare_queue(exclusive=True)
-            await queue.bind(exchange, routing_key="motion")
-
-            await gather(
-                self._respond_to_messages(queue),
-                self._periodic_ticks()
-            )
+            await queue.bind(exchange, routing_key="switch")
+            await self._respond_to_messages(queue)
 
     async def _respond_to_messages(self, queue):
         async with queue.iterator() as messages:
             async for message in messages:
                 with message.process():
+                    event = json.loads(message.body)
                     for zone in self.zones:
-                        event = json.loads(message.body)
                         await zone.on_event(event, get_event_loop().time())
-
-    async def _periodic_ticks(self):
-        """
-        Polling for timeouts might not be ideal,  but it means we can reuse our
-        tests.
-
-        Some design notes:
-
-        One disadvantage of an N-second tick is that we might want to schedule
-        events that unfold more quickly than that.  For instance,  if we want to do
-        a complex animation with the lights we need shorted timesteps.  Also the
-        callback style would get awkward if we were doing anything more complex
-        than what we are doing.
-
-        Assuming however,  that timeouts are the usual use case we need a way to
-        cancel them,  for instance,  if we have a 60 second timeout to turn off
-        the lights but there is another motion event,  we need to cancel the timeout.
-
-        Our polling strategy is one way to do that,  but it may be possible to
-        tell the event loop to not run the future tsak at all or alternatively set a
-        flag that tells the timeout "thread" to give up.
-
-        :return:
-        """
-        while True:
-            await sleep(10)
-            for zone in self.zones:
-                await zone.on_tick(get_event_loop().time())
 
     def send_to_hue(self, commands):
         """
-        Send commands ro hue
+        Send commands to hue
 
         :param commands:
         :return:
