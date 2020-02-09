@@ -7,7 +7,7 @@ Module to control Denon/Marantz
 
 import json
 from json import JSONDecodeError
-from asyncio import create_task, open_connection, StreamReader, StreamWriter
+from asyncio import create_task, open_connection, StreamReader, StreamWriter, iscoroutine, iscoroutinefunction
 from asyncio import get_event_loop, Future, CancelledError
 from typing import Dict, Set
 from urllib.parse import parse_qs
@@ -102,14 +102,14 @@ class HeosClientProtocol():
             if packet:
                 try:
                     jdata = json.loads(packet)
-                    self._handle_response(jdata)
+                    await self._handle_response(jdata)
                 except JSONDecodeError:
                     logger.error("Error parsing %s  as json", jdata)
             else:
                 break
 
     # pylint: disable=too-many-branches
-    def _handle_response(self, jdata):
+    async def _handle_response(self, jdata):
         """
         Handles JSON response from server.  JSON responses can be produced in response to
         command as well as events that happen to the receiver.  Events are routed to the
@@ -135,7 +135,7 @@ class HeosClientProtocol():
                 }
             # pylint: disable=broad-except
             try:
-                self._handle_event(event, message)
+                await self._handle_event(event, message)
             except Exception:
                 logger.error("Caught exception while in event handler for %s",
                              event,
@@ -186,9 +186,12 @@ class HeosClientProtocol():
             self.update_progress_listeners()
 
     # pylint: disable=no-self-use
-    def _handle_event(self, event, message):
+    async def _handle_event(self, event, message):
         for listener in self._listeners:
-            listener(event, message)
+            if iscoroutinefunction(listener):
+                await listener(event, message)
+            else:
+                listener(event, message)
 
     def update_progress_listeners(self):
         count = 0
