@@ -46,7 +46,6 @@ class LightZone:
             is_on = True
             how_bright = (event["value"] * 255) // 100
 
-        print("Sensor value is {value}");
         commands = []
         for group_id in self.groups:
             commands += [
