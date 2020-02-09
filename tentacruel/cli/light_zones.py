@@ -18,6 +18,7 @@ class LightZone:
 
     def __init__(self, effector, config):
         self.effector = effector
+        self.key = config["key"]
         self.groups = {config["group"]}
         self.switches = {config["switch"]}
 

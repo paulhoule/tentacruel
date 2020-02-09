@@ -48,6 +48,7 @@ class ControlLights:
         )
 
         for zone in self.zones:
+            logger.debug("Setting up zone %s", zone.key)
             await zone.setup()
 
         async with connection:
