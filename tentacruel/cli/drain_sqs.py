@@ -10,6 +10,7 @@ from aio_pika import connect_robust, ExchangeType, Message
 
 # pylint: disable=invalid-name
 from tentacruel.sqs import SqsQueue
+from tentacruel.time import utcnow, to_zulu_string
 
 logger = getLogger(__name__)
 
@@ -74,6 +75,7 @@ class DrainSQS:
                     device_event = dict(event["deviceEvent"])
                     device_event["_key"] = device_event["eventId"]
                     device_event["eventTime"] = event["eventTime"]
+                    device_event["drainTime"] = to_zulu_string(utcnow())
                     del device_event["eventId"]
                     event_batch.append(device_event)
 

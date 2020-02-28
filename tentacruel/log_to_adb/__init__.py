@@ -75,7 +75,7 @@ class LogToADB:
                 async for message in messages:
                     with message.process():
                         event = json.loads(message.body)
-                        event["loggedTime"]=to_zulu_string(utcnow())
+                        event["loggedTime"] = to_zulu_string(utcnow())
                         logger.debug("Received event: %s", event)
                         try:
                             self.collection.insert(event, silent=True)
