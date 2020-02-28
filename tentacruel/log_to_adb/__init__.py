@@ -13,6 +13,7 @@ from aio_pika import connect_robust, ExchangeType
 
 # pylint: disable=invalid-name
 from arango import DocumentInsertError, DocumentUpdateError
+from tentacruel.time import to_zulu_string, utcnow
 
 logger = getLogger(__name__)
 
@@ -74,6 +75,7 @@ class LogToADB:
                 async for message in messages:
                     with message.process():
                         event = json.loads(message.body)
+                        event["loggedTime"]=to_zulu_string(utcnow())
                         logger.debug("Received event: %s", event)
                         try:
                             self.collection.insert(event, silent=True)

@@ -1,0 +1,5 @@
+for s in sqs_events
+    filter s.attribute=='switch'
+    sort s.eventTime desc
+    limit 10
+    return s
