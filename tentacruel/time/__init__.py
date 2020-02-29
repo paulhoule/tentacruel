@@ -20,6 +20,7 @@ package defines aliases so you can write::
 for civilized coding.
 """
 import datetime as dt
+from numbers import Number
 
 UTC = dt.timezone.utc
 
@@ -27,8 +28,6 @@ fromisoformat = dt.datetime.fromisoformat   # pylint: disable=invalid-name
 Datetime = dt.datetime                      # pylint: disable=invalid-name
 now = Datetime.now                          # pylint: disable=invalid-name
 utcnow = lambda: now(UTC)                   # pylint: disable=invalid-name
-
-
 
 def from_zulu_string(when: str):
     """
@@ -50,3 +49,6 @@ def to_zulu_string(when: Datetime):
     :return: "2019-01-04T02:12:55Z"
     """
     return when.isoformat().replace("+00:00", "Z")
+
+def timestamp_to_zulu(posixMilliseconds: Number):
+    return to_zulu_string(Datetime.fromtimestamp(float(posixMilliseconds)/1000,tz=UTC))

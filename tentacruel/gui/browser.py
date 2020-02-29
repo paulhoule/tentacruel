@@ -140,7 +140,7 @@ class GeneralBrowser(ManagedGridFrame):
     async def insert_item(self, item):
         keys = keep(item, {"cid", "mid"})
         keys["sid"] = self.coordinates["sid"]
-        if "cid" not in keys:
+        if "cid" in self.coordinates and "cid" not in keys:
             keys["cid"] = self.coordinates["cid"]
 
         self._item_ids.add((keys["sid"], keys["cid"], keys.get("mid", None)))

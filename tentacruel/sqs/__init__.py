@@ -54,7 +54,8 @@ class SqsQueue:
         response = self.sqs.receive_message(
             QueueUrl=self.url,
             MaxNumberOfMessages=10,
-            WaitTimeSeconds=int(environ.get("WAIT_TIME_SECONDS", 20))
+            WaitTimeSeconds=int(environ.get("WAIT_TIME_SECONDS", 20)),
+            AttributeNames=["ApproximateFirstReceiveTimestamp", "SentTimestamp"]
         )
 
         if "Messages" not in response:
