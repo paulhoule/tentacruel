@@ -1,43 +1,89 @@
 """
-Pinger application.  Periodically poll hosts to see if they are up.  Log state in the
-document database,  but report state changes to the message Q
+Websocket gateway.
+
+Convert websocket calls to calls to the HEOS server
 
 """
-from asyncio import run, get_event_loop, create_task, get_running_loop
+import json
+from _contextvars import ContextVar
+from asyncio import create_task
+from logging import getLogger, StreamHandler
+from os import environ
+from pathlib import Path
+from uuid import uuid1
 
-from aio_pika import ExchangeType, connect_robust
-from tentacruel.config import get_config
-from tentacruel.heos_watcher import HeosWatcher
-from tentacruel.pinger import ensure_proactor, Pinger
-from tentacruel.pinger.hue_ping import hue_loop, protect
+import aiohttp
+import yaml
+from aiohttp import web
+from tentacruel import HeosClientProtocol
+from tentacruel.pinger import ensure_proactor
+
+if "LOGGING_LEVEL" in environ:
+    getLogger(None).setLevel(environ["LOGGING_LEVEL"])
+getLogger(None).addHandler(StreamHandler())
+
+LOG = getLogger(__name__)
+
+# DEFINE CONTEXT VAR
+REQUEST_ID = ContextVar("REQUEST_ID")
+
+async def heos(request):
+    listener_id = str(uuid1())
+    LOG.debug("Starting Listener with id "+listener_id)
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+
+    async def send_event(event, message):
+        packet = {"type": "event", "event": event, "message": message}
+        LOG.debug("about to send "+event)
+        await ws.send_str(json.dumps(packet))
+
+    async def send_reply(response):
+        packet= {
+            "type": "response",
+            "requestId": REQUEST_ID.get(),
+            "message": response.result()
+        }
+        LOG.debug("replied with "+str(packet))
+        await ws.send_str(json.dumps(packet))
+
+    heos_client.add_listener(send_event)
+
+    async for msg in ws:
+        if msg.type == aiohttp.WSMsgType.TEXT:
+            packet = json.loads(msg.data)
+            LOG.debug("got: "+str(packet))
+            reset_token = REQUEST_ID.set(packet["requestId"])
+            try:
+                heos_client._run_command(
+                    packet["command"],
+                    **packet["parameters"]
+                ).add_done_callback(lambda x: create_task(send_reply(x)))
+            finally:
+                REQUEST_ID.reset(reset_token)
+        elif msg.type == aiohttp.WSMsgType.ERROR:
+            LOG.debug('ws connection closed with exception', exc_info=ws.exception())
+
+    LOG.debug('websocket connection closed')
+    heos_client.remove_listener(send_event)
+
+    return ws
+
+def my_listener(event, message):
+    print(event, message)
+
+async def init(that):
+    await heos_client.setup()
 
 
-async def pika_connect(config):
-    """
-    Initialization that can only be completed in an async method
-    """
-    connection = await connect_robust(
-        loop=get_event_loop(),
-        **config["pika"]
-    )
-
-    channel = await connection.channel()
-    exchange = await channel.declare_exchange("smartthings", ExchangeType.FANOUT)
-    return exchange
-
-async def amain():
-    """
-    Asynchronous main method.
-
-    :return:
-    """
-    config = get_config()
-    watcher = HeosWatcher(config)
-    await watcher.run()
-    never = get_running_loop().create_future()
-    await never
-
+with open(Path.home() / ".tentacruel" / "config.yaml") as a_stream:
+    config = yaml.load(a_stream)
 
 if __name__ == "__main__":
     ensure_proactor()
-    run(amain())
+    app = web.Application()
+    heos_client = HeosClientProtocol(config["server"]["ip"])
+    app.on_startup.append(init)
+    app.add_routes([web.get('/heos', heos)])
+    web.run_app(app, host='localhost', port=9617)
+

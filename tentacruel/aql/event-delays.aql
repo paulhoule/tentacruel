@@ -1,0 +1,14 @@
+for e in sqs_events
+   filter e.attribute in @attributes
+   sort e.loggedTime DESC
+   limit 100
+   return {
+        when: date_diff(date_now(),e.loggedTime,"i"),
+        attribute: e.attribute,
+        value: e.value,
+        lambdaDelay: date_diff(e.eventTime, e.lambdaTime, "f"),
+        enqueuedDelay: date_diff(e.lambdaTime, e.enqueuedTime, "f"),
+        receiveDelay: date_diff(e.enqueuedTime, e.firstReceivedTime, "f"),
+        drainDelay: date_diff(e.firstReceivedTime, e.drainTime, "f"),
+        logDelay: date_diff(e.drainTime, e.loggedTime, "f")
+   }

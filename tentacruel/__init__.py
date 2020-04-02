@@ -6,6 +6,7 @@ Module to control Denon/Marantz
 """
 
 import json
+from collections import deque, defaultdict
 from json import JSONDecodeError
 from asyncio import create_task, open_connection, StreamReader, StreamWriter, iscoroutine, iscoroutinefunction
 from asyncio import get_event_loop, Future, CancelledError
@@ -18,6 +19,7 @@ from tentacruel.system import _HeosSystem
 from tentacruel.browse import _HeosBrowse
 from tentacruel.player import _HeosPlayer
 from tentacruel.group import _HeosGroup
+from frozendict import frozendict
 
 def keep(source: Dict, keep_keys: Set):
     return {key: value for (key, value) in source.items() if key in keep_keys}
@@ -39,6 +41,28 @@ FAVORITES = 1028
 #
 logger = getLogger(__name__)
 
+class MessageKeyGenerator():
+    COMMANDS = {
+        "player/get_players": [],
+        "player/get_play_state": ["pid"],
+        "player/set_play_state": ["pid"],
+        "system/register_for_change_events": []
+    }
+
+    def generate(self, command,  message):
+        if isinstance(message, str):
+            message = {
+                    key: value[0]
+                    for key, value
+                    in parse_qs(message).items()
+                }
+        hash = {"$command": command}
+        for key in self.COMMANDS[command]:
+            hash[key] = str(message[key])
+
+        return frozendict(hash)
+
+
 class HeosClientProtocol():
     """
     Asynchronous protocol handler for Denon's Heos protocol for controlling home theatre receivers
@@ -54,16 +78,20 @@ class HeosClientProtocol():
         self.group = _HeosGroup(self)
         self.players = {}
 
-        self.inflight_commands = dict()
+        self.inflight_commands = defaultdict(deque)
         self._sources = {}
         self._sequence = 1
         self._listeners = []
         self._progress_listeners = []
         self._players = []
         self._tasks = []
+        self._keygen = MessageKeyGenerator()
 
     def add_listener(self, listener):
         self._listeners += [listener]
+
+    def remove_listener(self, listener):
+        self._listeners.remove(listener)
 
     def add_progress_listener(self, listener):
         self._progress_listeners += [listener]
@@ -73,18 +101,25 @@ class HeosClientProtocol():
         Tasks we run as soon as the server is connected.  This includes turning on events,
         listing available music sources,  etc.
 
-        In the immediate term I am working on a complete cycle of finding a piece of music
-        and playing it and I am doing that here because it is easy,  probably if we want
-        to separate this from the protocol,  this function can be implemented as a callback.
-
         :return:
         """
         (self._reader, self._writer) = await open_connection(self._host, HEOS_PORT)
-        self._tasks.append(create_task(self.receive_loop()))
+        self._tasks.append(await self.create_receive_loop())
         await self.system.register_for_change_events()
         self._players = await _HeosPlayer(self).get_players()
         for player in self._players:
             self.players[player["name"]] = _HeosPlayer(self, player["pid"])
+
+    def task_is_done(self, future: Future):
+        if future.exception():
+            logger.error("The receive_loop ended with exception ",exc_info=future.exception())
+        else:
+            logger.debug("The receive_loop task completed without incident")
+
+    async def create_receive_loop(self):
+        task = create_task(self.receive_loop())
+        task.add_done_callback(self.task_is_done)
+        return task
 
     async def shutdown(self):
         for task in self._tasks:
@@ -98,7 +133,9 @@ class HeosClientProtocol():
 
     async def receive_loop(self):
         while True:
+            logger.debug("Waiting for message from HEOS server")
             packet = await self._reader.readline()
+            logger.debug("HEOS server sent: %s", packet)
             if packet:
                 try:
                     jdata = json.loads(packet)
@@ -107,6 +144,7 @@ class HeosClientProtocol():
                     logger.error("Error parsing %s  as json", jdata)
             else:
                 break
+        logger.debug("Fell out of receive_loop");
 
     # pylint: disable=too-many-branches
     async def _handle_response(self, jdata):
@@ -154,21 +192,14 @@ class HeosClientProtocol():
                 logger.error("Received HEOS reply for command %s without message", command)
                 message = {}
 
-            futures = self.inflight_commands[command]
-            if "SEQUENCE" in message:
-                sequence = int(message["SEQUENCE"])
-                future = futures[sequence]
-                logger.debug("Removing %s", future)
-                del futures[sequence]
-            elif len(futures) == 1:
-                key = list(futures.keys())[0]
-                future = futures[key]
-                logger.debug("Removing %s", future)
-                del futures[key]
-            elif not futures:
-                raise ValueError("No future found to match command: " + command)
-            elif len(futures) > 1:
-                raise ValueError("Multiple matching futures found for command: " + command)
+#
+# the problem here:  the SEQUENCE number is not always retained,  it is for browse command,  but
+# not for other commands.  I think we can still match up other commands with the appropriate arguments,
+# for instance, in the case of player/get_play_state,  the pid is the relevant argument.  We need to
+# go through the HEOS commands we actually use...
+#
+            cmd_key = self._keygen.generate(command, message)
+            future = self.inflight_commands[cmd_key].popleft()
 
             if not jdata["heos"]["result"] == "success":
                 message = {key: value[0] for key, value in
@@ -211,15 +242,13 @@ class HeosClientProtocol():
                 return player
         raise KeyError(f"Couldn't find player with key {that}")
 
-
     def _run_command(self, command: str, **arguments) -> Future:
         future = create_future()
         this_event = self._sequence
         self._sequence += 1
 
-        if not command in self.inflight_commands:
-            self.inflight_commands[command] = {}
-        self.inflight_commands[command][this_event] = future
+        cmd_key = self._keygen.generate(command, arguments)
+        self.inflight_commands[cmd_key].append(future)
         self.update_progress_listeners()
 
         base_url = f"heos://{command}"

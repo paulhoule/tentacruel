@@ -50,7 +50,7 @@ class SqsQueue:
 
         :return: List of messages
         """
-        LOGGER.debug("Waiting to receive messages from SQS queue")
+
         response = self.sqs.receive_message(
             QueueUrl=self.url,
             MaxNumberOfMessages=10,

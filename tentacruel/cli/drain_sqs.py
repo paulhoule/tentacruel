@@ -60,8 +60,9 @@ class DrainSQS:
                     continue
 
     async def _poll_sqs(self, exchange):
-        logger.debug("Waiting to receive messages from SQS queue")
+        logger.info("Receiving messages from SQS queue at time %s", to_zulu_string(utcnow()))
         messages = self.sqs.receive()
+        logger.info("Received %d messages from SQS queue at time %s", len(messages), to_zulu_string(utcnow()))
         event_batch = []
         delete_batch = []
         if messages:

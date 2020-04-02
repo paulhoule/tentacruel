@@ -16,6 +16,7 @@ attributes = {
         "subattributes": ["cur_pos", "duration"]
     }
 }
+
 class HeosWatcher:
 
     def __init__(self, config, exchange: Exchange):
