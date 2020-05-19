@@ -85,6 +85,6 @@ if __name__ == "__main__":
     heos_client = HeosClientProtocol(config["server"]["ip"])
     app.on_startup.append(init)
     app.add_routes([web.get('/heos', heos)])
-    web.run_app(app, host='localhost', port=9617)
+    web.run_app(app, host='0.0.0.0', port=9617)
 
 
