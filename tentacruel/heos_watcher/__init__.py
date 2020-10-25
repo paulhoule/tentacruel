@@ -16,22 +16,3 @@ attributes = {
         "subattributes": ["cur_pos", "duration"]
     }
 }
-
-class HeosWatcher:
-
-    def __init__(self, config, exchange: Exchange):
-        self.config = config
-        self.exchange = exchange
-
-    async def setup(self):
-        self._heos = HeosClientProtocol(self.config["server"]["ip"])
-        await self._heos.setup()
-        self._heos.add_listener(self.listener)
-
-    async def run(self):
-        await self.setup()
-
-    async def listener(self, event, message):
-        print(event)
-        print(message)
-        print("--------------")

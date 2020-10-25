@@ -178,6 +178,7 @@ class Application:
             return matching[0]
 
         async def play(self, parameters):
+            heos = await self._heos()
             if not parameters:
                 await self._player.set_play_state("play")
             else:
@@ -191,7 +192,7 @@ class Application:
                     if not song:
                         raise ValueError(f"Could not find track named '{track}'")
                     song = keep(song, {"cid", "sid", "mid"})
-                    await self._player.add_to_queue(aid=aid, **song)
+                    await heos.browse.add_to_queue(pid=self._player.pid(),aid=aid, **song)
 
                 await self._player.set_play_mode()
 
@@ -242,6 +243,17 @@ class Application:
                 raise ValueError("The volume parameter must be between 0.0 and 100.0")
 
             await self._player.set_volume(volume)
+
+        async def list_players(self, parameters):
+            if parameters:
+                raise ValueError("The list players command takes no arguments")
+
+            heos = await self._heos()
+            result = heos.get_players()
+            if not result:
+                print(f"The HEOS system has no players.")
+            else:
+                print(result)
 
         async def list_groups(self, parameters):
             if parameters:
@@ -475,6 +487,7 @@ class Application:
             await self.teardown()
 
     async def teardown(self):
+        logger.info("Tearing system down")
         await self.commands.teardown()
 
     def help(self):

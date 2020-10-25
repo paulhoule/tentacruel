@@ -62,3 +62,23 @@ class _HeosBrowse(_HeosService):
             search=search,
             scid=scid
         )
+
+    async def add_to_queue(self, pid, sid=None, cid=None, mid=None, aid=None):
+        if aid is None:
+            aid = self.REPLACE_AND_PLAY
+
+        arguments = dict(
+            pid=pid,
+            aid=aid
+        )
+        if sid:
+            arguments["sid"] = sid
+        if cid:
+            arguments["cid"] = cid
+        if mid:
+            arguments["mid"] = mid
+
+        return await self._run(
+            "add_to_queue",
+            **arguments
+        )

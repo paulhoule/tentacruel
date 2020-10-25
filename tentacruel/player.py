@@ -143,25 +143,7 @@ class _HeosPlayer(_HeosService):
             **arguments
         )
 
-    async def add_to_queue(self, sid=None, cid=None, mid=None, aid=None):
-        if aid is None:
-            aid = self.REPLACE_AND_PLAY
 
-        arguments = dict(
-            pid=self._pid,
-            aid=aid
-        )
-        if sid:
-            arguments["sid"] = sid
-        if cid:
-            arguments["cid"] = cid
-        if mid:
-            arguments["mid"] = mid
-
-        return await self._run(
-            "add_to_queue",
-            **arguments
-        )
 
     async def play_queue(self, qid=1) -> Future:
         return await self._run(

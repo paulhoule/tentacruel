@@ -13,6 +13,7 @@ from asyncio import get_event_loop, Future, CancelledError
 from typing import Dict, Set
 from urllib.parse import parse_qs
 from logging import getLogger
+from uuid import uuid4
 
 from tentacruel.service import _HeosService, HeosError
 from tentacruel.system import _HeosSystem
@@ -43,19 +44,36 @@ logger = getLogger(__name__)
 
 class MessageKeyGenerator():
     COMMANDS = {
+        "browse/add_to_queue": ["SEQUENCE"],
+        "group/get_groups": [],
+        "group/set_group": ["pid"],
+        "player/clear_queue": ["pid"],
         "player/get_players": [],
         "player/get_play_state": ["pid"],
         "player/set_play_state": ["pid"],
+        "player/set_play_mode": ["pid", "repeat", "shuffle"],
+        "player/set_volume": ["pid","level"],
         "system/register_for_change_events": []
     }
 
     def generate(self, command,  message):
+        """
+        Returns a hashable value that can be used as a dictionary key
+
+        For the browse commands we append a random SEQUENCE
+        identifier as a uuid,  otherwise we return a frozendict.
+
+        :param command:
+        :param message:
+        :return:
+        """
         if isinstance(message, str):
             message = {
                     key: value[0]
                     for key, value
                     in parse_qs(message).items()
                 }
+
         hash = {"$command": command}
         for key in self.COMMANDS[command]:
             hash[key] = str(message[key])
@@ -110,15 +128,8 @@ class HeosClientProtocol():
         for player in self._players:
             self.players[player["name"]] = _HeosPlayer(self, player["pid"])
 
-    def task_is_done(self, future: Future):
-        if future.exception():
-            logger.error("The receive_loop ended with exception ",exc_info=future.exception())
-        else:
-            logger.debug("The receive_loop task completed without incident")
-
     async def create_receive_loop(self):
         task = create_task(self.receive_loop())
-        task.add_done_callback(self.task_is_done)
         return task
 
     async def shutdown(self):
@@ -192,12 +203,6 @@ class HeosClientProtocol():
                 logger.error("Received HEOS reply for command %s without message", command)
                 message = {}
 
-#
-# the problem here:  the SEQUENCE number is not always retained,  it is for browse command,  but
-# not for other commands.  I think we can still match up other commands with the appropriate arguments,
-# for instance, in the case of player/get_play_state,  the pid is the relevant argument.  We need to
-# go through the HEOS commands we actually use...
-#
             cmd_key = self._keygen.generate(command, message)
             future = self.inflight_commands[cmd_key].popleft()
 
@@ -244,21 +249,15 @@ class HeosClientProtocol():
 
     def _run_command(self, command: str, **arguments) -> Future:
         future = create_future()
-        this_event = self._sequence
-        self._sequence += 1
+        if command.startswith("browse/"):
+            if "SEQUENCE" not in arguments:
+                arguments["SEQUENCE"] = uuid4()
 
         cmd_key = self._keygen.generate(command, arguments)
         self.inflight_commands[cmd_key].append(future)
         self.update_progress_listeners()
 
         base_url = f"heos://{command}"
-        if arguments:
-            if "SEQUENCE" not in arguments:
-                arguments["SEQUENCE"] = this_event
-
-            if not arguments["SEQUENCE"]:
-                del arguments["SEQUENCE"]
-
         if arguments:
             url = base_url + "?" + "&".join(f"{key}={value}" for (key, value) in arguments.items())
         else:

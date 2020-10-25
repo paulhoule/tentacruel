@@ -44,10 +44,10 @@ def get_config(config_file="config.yaml", package=None):
     """
     if package:
         with resource_stream(package, config_file) as config:
-            return yaml.load(config)
+            return yaml.safe_load(config)
 
     with open(Path.home() / ".tentacruel" / config_file) as config:
-        return yaml.load(config)
+        return yaml.safe_load(config)
 
 def configure_logging() -> None:
     """
