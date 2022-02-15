@@ -82,3 +82,17 @@ class _HeosBrowse(_HeosService):
             "add_to_queue",
             **arguments
         )
+
+    async def play_input(self, pid, input, spid=None):
+
+        arguments = dict(
+            pid=pid,
+            input=input
+        )
+        if spid:
+            arguments["spid"] = spid
+
+        return await self._run(
+            "play_input",
+            **arguments
+        )

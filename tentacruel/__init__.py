@@ -22,6 +22,9 @@ from tentacruel.player import _HeosPlayer
 from tentacruel.group import _HeosGroup
 from frozendict import frozendict
 
+SEQUENCE = ["SEQUENCE"]
+
+
 def keep(source: Dict, keep_keys: Set):
     return {key: value for (key, value) in source.items() if key in keep_keys}
 
@@ -44,7 +47,8 @@ logger = getLogger(__name__)
 
 class MessageKeyGenerator():
     COMMANDS = {
-        "browse/add_to_queue": ["SEQUENCE"],
+        "browse/add_to_queue": SEQUENCE,
+        "browse/play_input": SEQUENCE,
         "group/get_groups": [],
         "group/set_group": ["pid"],
         "player/clear_queue": ["pid"],

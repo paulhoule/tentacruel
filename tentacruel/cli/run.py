@@ -177,6 +177,10 @@ class Application:
 
             return matching[0]
 
+        async def input(self, parameters):
+            heos = await self._heos()
+            await heos.browse.play_input(pid=self._player.pid(),input=parameters[0])
+
         async def play(self, parameters):
             heos = await self._heos()
             if not parameters:
