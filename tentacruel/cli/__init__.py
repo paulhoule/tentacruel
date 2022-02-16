@@ -1,2 +1,2 @@
 # pylint: disable=missing-docstring
-from . light_zones import LightZone
+from . light_zones import HueZone

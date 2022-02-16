@@ -8,7 +8,8 @@ from logging import getLogger
 
 from aio_pika import connect_robust, ExchangeType
 from phue import Bridge
-from tentacruel.cli import LightZone
+from tentacruel.cli import HueZone
+from tentacruel.cli.light_zones import LifxZone
 
 logger = getLogger(__name__)
 # pylint: disable=too-few-public-methods
@@ -24,12 +25,15 @@ class ControlLights:
         self.bridge = Bridge()
 
         self.zones = [
-            LightZone(
-                self.send_to_hue,
-                zone
-            )
-            for zone in config["zones"]
+            self.zone(zone) for zone in config["zones"]
         ]
+
+    def zone(self, config):
+        if config["action"]=="hue":
+            return HueZone(self.send_to_hue, config)
+        if config["action"]=="lifx":
+            return LifxZone(self.send_to_hue, config)
+        raise ValueError("No zone but the FriendZone")
 
     async def do(self, parameters):
         """

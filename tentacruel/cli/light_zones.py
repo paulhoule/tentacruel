@@ -3,10 +3,12 @@
 
 from logging import getLogger, DEBUG
 
+from tentacruel.lifx import LIFX
+
 LOGGER = getLogger()
 
 # pylint: disable=too-many-instance-attributes
-class LightZone:
+class HueZone:
     """
     Starting to shape up architecturally,  might even have it be testable!
 
@@ -65,3 +67,40 @@ class LightZone:
         :return:
         """
         self.effector(commands)
+
+lifx = LIFX()
+
+class LifxZone:
+    """
+        For now turns on all the Lifx lights because that is easy to do.
+
+    """
+
+    def __init__(self, effector, config):
+        self.effector = effector
+        self.key = config["key"]
+        self.switches = {config["switch"]}
+
+    async def setup(self):
+        pass
+
+    async def on_event(self, event, when):
+        """
+
+        :param event:
+        :return:
+        """
+
+        if event["attribute"] not in {"switch", "level"}:
+            return
+
+        device_id = event["deviceId"]
+        if device_id not in self.switches:
+            return
+
+        if event["attribute"] == "switch":
+            is_on = event["value"] == "on"
+            if is_on:
+                lifx.power_on()
+            else:
+                lifx.power_off()
